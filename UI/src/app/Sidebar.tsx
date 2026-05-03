@@ -138,13 +138,14 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
                         return (
                           <div key={group.id} className={styles.groupItem}>
                             {/* Generator Group */}
-                            <button
-                              type="button"
-                              className={styles.groupHeader}
-                              onClick={() => toggleGroup(group.id)}
-                              aria-expanded={!isGroupCollapsed}
-                            >
-                              <div className={styles.groupHeaderLeft}>
+                            <div className={styles.groupHeader}>
+                              <NavLink
+                                to={`/generator-groups/${group.id}`}
+                                className={({ isActive }) =>
+                                  `${styles.groupNavLink} ${isActive ? styles.groupNavLinkActive : ''}`
+                                }
+                                onClick={handleNavigate}
+                              >
                                 <FolderTree
                                   size={13}
                                   className={styles.groupIcon}
@@ -152,17 +153,24 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
                                 <span className={styles.groupName}>
                                   {group.label}
                                 </span>
-                              </div>
+                              </NavLink>
 
-                              <ChevronDown
-                                size={13}
-                                className={`${styles.groupChevron} ${
-                                  isGroupCollapsed
-                                    ? styles.groupChevronCollapsed
-                                    : ''
-                                }`}
-                              />
-                            </button>
+                              <button
+                                type="button"
+                                className={styles.groupCollapseBtn}
+                                onClick={() => toggleGroup(group.id)}
+                                aria-expanded={!isGroupCollapsed}
+                              >
+                                <ChevronDown
+                                  size={13}
+                                  className={`${styles.groupChevron} ${
+                                    isGroupCollapsed
+                                      ? styles.groupChevronCollapsed
+                                      : ''
+                                  }`}
+                                />
+                              </button>
+                            </div>
 
                             {!isGroupCollapsed && (
                               <div className={styles.genList}>

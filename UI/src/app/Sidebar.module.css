@@ -206,33 +206,65 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 6px 10px;
   border-radius: 7px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  transition: background-color 0.15s ease;
+  overflow: hidden;
 }
 
-.groupHeader:hover {
-  background-color: rgba(31, 41, 55, 0.4);
-}
-
-.groupHeaderLeft {
+.groupNavLink {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;
-  min-width: 0;
+  padding: 6px 10px;
+  border-radius: 7px;
+  text-decoration: none;
+  color: #9ca3af;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.groupNavLink:hover {
+  background-color: rgba(31, 41, 55, 0.4);
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.groupNavLinkActive {
+  background-color: rgba(250, 204, 21, 0.1);
+  color: #facc15;
+}
+
+.groupNavLinkActive:hover {
+  background-color: rgba(250, 204, 21, 0.15);
+  color: #facc15;
+}
+
+.groupCollapseBtn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 5px;
+  transition: background-color 0.15s ease;
+}
+
+.groupCollapseBtn:hover {
+  background-color: rgba(31, 41, 55, 0.6);
 }
 
 .groupIcon {
-  color: #6b7280;
+  color: inherit;
   flex-shrink: 0;
 }
 
 .groupName {
-  color: #9ca3af;
+  color: inherit;
   font-size: 0.8125rem;
   font-weight: 500;
   white-space: nowrap;
