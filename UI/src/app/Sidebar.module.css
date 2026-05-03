@@ -1,0 +1,446 @@
+.sidebar {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: #030712;
+  border-right: 1px solid #1f2937;
+  width: 256px;
+  min-width: 256px;
+  max-width: 256px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* ── Logo ── */
+.logoSection {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px;
+  border-bottom: 1px solid #1f2937;
+  flex-shrink: 0;
+}
+
+.logoIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #facc15, #f97316);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(250, 204, 21, 0.25);
+  flex-shrink: 0;
+}
+
+.logoName {
+  color: #ffffff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.logoSub {
+  color: #6b7280;
+  font-size: 0.75rem;
+  margin: 0;
+}
+
+/* ── Navigation ── */
+.nav {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  padding: 16px 12px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nav::-webkit-scrollbar {
+  width: 4px;
+}
+
+.nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.nav::-webkit-scrollbar-thumb {
+  background: #374151;
+  border-radius: 2px;
+}
+
+.sectionLabel {
+  color: #4b5563;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 0 12px 8px;
+  margin: 0;
+}
+
+/* ── Overview nav button: keep old styling ── */
+.navBtn {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 0.875rem;
+  cursor: pointer;
+  text-align: left;
+  text-decoration: none;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+  box-sizing: border-box;
+}
+
+.navBtn:hover {
+  background-color: #1f2937;
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.navBtnActive {
+  background-color: rgba(250, 204, 21, 0.1);
+  color: #facc15;
+}
+
+.navBtnActive:hover {
+  background-color: rgba(250, 204, 21, 0.15);
+  color: #facc15;
+}
+
+/* ── Regions ── */
+.regionList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.regionGroup {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.regionHeader {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  margin-top: 2px;
+}
+
+.regionHeader:hover {
+  background-color: rgba(31, 41, 55, 0.45);
+}
+
+.regionHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.regionIcon {
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+.regionName {
+  color: #9ca3af;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  min-width: 0;
+}
+
+.regionChevron {
+  color: #4b5563;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.regionChevronCollapsed {
+  transform: rotate(-90deg);
+}
+
+/* ── Groups ── */
+.groupList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-left: 12px;
+  padding-left: 10px;
+  border-left: 1px solid rgba(31, 41, 55, 0.9);
+  min-width: 0;
+}
+
+.groupItem {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.groupHeader {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.groupHeader:hover {
+  background-color: rgba(31, 41, 55, 0.4);
+}
+
+.groupHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.groupIcon {
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+.groupName {
+  color: #9ca3af;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.groupChevron {
+  color: #4b5563;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.groupChevronCollapsed {
+  transform: rotate(-90deg);
+}
+
+/* ── Generators ── */
+.genList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-left: 10px;
+  padding-left: 8px;
+  border-left: 1px dashed rgba(31, 41, 55, 0.9);
+  min-width: 0;
+}
+
+.genBtn {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px; /* smaller */
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 0.8125rem; /* smaller */
+  cursor: pointer;
+  text-align: left;
+  text-decoration: none;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+  box-sizing: border-box;
+}
+
+.genBtn:hover {
+  background-color: #111827;
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.genBtn:hover .chevron {
+  opacity: 1;
+}
+
+.genBtnActive {
+  background-color: rgba(250, 204, 21, 0.1);
+  color: #facc15;
+}
+
+.genBtnActive:hover {
+  background-color: rgba(250, 204, 21, 0.14);
+  color: #facc15;
+}
+
+.genIcon {
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+.genInfo {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.genName {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.genCapacity {
+  display: none; /* backend sidebar data no longer has capacity; keep hidden */
+  font-size: 0.72rem;
+  color: #4b5563;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 2px 0 0;
+}
+
+.genRight {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.chevron {
+  opacity: 0;
+  transition:
+    opacity 0.15s ease,
+    transform 0.2s ease;
+}
+
+.chevronActive {
+  opacity: 1;
+  transform: rotate(90deg);
+}
+
+/* optional old status classes kept for compatibility */
+.statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.statusGreen {
+  background-color: #34d399;
+}
+
+.statusAmber {
+  background-color: #fbbf24;
+}
+
+.statusRed {
+  background-color: #f87171;
+}
+
+/* ── Loading / error ── */
+.loadingBlock,
+.errorBlock {
+  padding: 8px 12px;
+}
+
+.loadingText {
+  color: #6b7280;
+  font-size: 0.8125rem;
+  margin: 0;
+}
+
+.errorText {
+  color: #f87171;
+  font-size: 0.8125rem;
+  margin: 0;
+}
+
+/* ── Bottom ── */
+.bottom {
+  padding: 12px;
+  border-top: 1px solid #1f2937;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.settingsBtn {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 0.875rem;
+  cursor: pointer;
+  text-align: left;
+  text-decoration: none;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+  box-sizing: border-box;
+}
+
+.settingsBtn:hover {
+  background-color: #1f2937;
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.periodCard {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  background-color: #111827;
+  border: 1px solid #1f2937;
+  min-width: 0;
+}
+
+.periodLabel {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+.periodValue {
+  font-size: 0.875rem;
+  color: #ffffff;
+  margin: 2px 0 0;
+}

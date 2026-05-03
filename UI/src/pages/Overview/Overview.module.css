@@ -1,0 +1,277 @@
+.page {
+  flex: 1;
+  overflow-y: auto;
+  background-color: #111827;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.page::-webkit-scrollbar {
+  width: 6px;
+}
+.page::-webkit-scrollbar-track {
+  background: transparent;
+}
+.page::-webkit-scrollbar-thumb {
+  background: #374151;
+  border-radius: 3px;
+}
+
+/* ── Header ── */
+.header {
+}
+.pageTitle {
+  color: #ffffff;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+}
+.pageSub {
+  color: #9ca3af;
+  font-size: 0.875rem;
+  margin: 4px 0 0;
+}
+
+/* ── KPI Grid ── */
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+@media (min-width: 1024px) {
+  .kpiGrid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* ── Stat Card ── */
+.statCard {
+  background-color: #030712;
+  border-radius: 16px;
+  border: 1px solid #1f2937;
+  padding: 20px;
+}
+
+.statCardBlue {
+  border-color: rgba(96, 165, 250, 0.2);
+}
+.statCardYellow {
+  border-color: rgba(234, 179, 8, 0.2);
+}
+.statCardEmerald {
+  border-color: rgba(52, 211, 153, 0.2);
+}
+.statCardRed {
+  border-color: rgba(248, 113, 113, 0.2);
+}
+
+.statIconWrap {
+  display: inline-flex;
+  padding: 10px;
+  border-radius: 12px;
+  background-color: #1f2937;
+}
+
+.statLabel {
+  color: #9ca3af;
+  font-size: 0.75rem;
+  margin: 12px 0 0;
+}
+
+.statValue {
+  color: #ffffff;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 4px 0 0;
+}
+
+.statSub {
+  color: #6b7280;
+  font-size: 0.75rem;
+  margin: 4px 0 0;
+}
+
+/* ── Charts Row ── */
+.chartsRow {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 1024px) {
+  .chartsRow {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.chartCard {
+  background-color: #030712;
+  border-radius: 16px;
+  border: 1px solid #1f2937;
+  padding: 20px;
+  min-width: 0; /* ← prevents grid cell from expanding to fit SVG content */
+  overflow: hidden;
+}
+
+.chartHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.chartTitle {
+  color: #ffffff;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin: 0;
+}
+
+/* ── Summary Table Card ── */
+.tableCard {
+  background-color: #030712;
+  border-radius: 16px;
+  border: 1px solid #1f2937;
+}
+
+.tableCardHeader {
+  padding: 16px 20px;
+  border-bottom: 1px solid #1f2937;
+}
+
+.tableCardTitle {
+  color: #ffffff;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin: 0;
+}
+
+.tableScroll {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.th {
+  color: #6b7280;
+  font-weight: 500;
+  font-size: 0.75rem;
+  padding: 12px 20px;
+  border-bottom: 1px solid #1f2937;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.thRight {
+  text-align: right;
+}
+.thCenter {
+  text-align: center;
+}
+
+.tr {
+  border-bottom: 1px solid rgba(31, 41, 55, 0.5);
+  transition: background-color 0.15s ease;
+}
+
+.tr:hover {
+  background-color: rgba(31, 41, 55, 0.3);
+}
+
+.tr:last-child {
+  border-bottom: none;
+}
+
+.td {
+  padding: 16px 20px;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.tdRight {
+  text-align: right;
+}
+.tdCenter {
+  text-align: center;
+}
+
+/* Generator name cell */
+.genNameCell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.genBadge {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #030712;
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.genNameText {
+  color: #ffffff;
+}
+
+.tdGray {
+  color: #9ca3af;
+}
+.tdYellow {
+  color: #facc15;
+  font-weight: 500;
+}
+.tdEmerald {
+  color: #34d399;
+  font-weight: 500;
+}
+.tdWhite {
+  color: #d1d5db;
+}
+
+/* Status badge */
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: currentColor;
+}
+
+/* Action button */
+.actionBtn {
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  background-color: rgba(250, 204, 21, 0.1);
+  color: #facc15;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.actionBtn:hover {
+  background-color: rgba(250, 204, 21, 0.2);
+}

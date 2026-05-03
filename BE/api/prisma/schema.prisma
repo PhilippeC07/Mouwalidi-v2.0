@@ -1,0 +1,149 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Region {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name            String           @unique
+  generatorGroups GeneratorGroup[]
+}
+
+model Generator {
+  id                       String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                     String
+  kvaCapacity              Float
+  averageDieselConsumption Float
+  status                   String
+  generatorGroupId         String           @db.Uuid
+  generatorGroup           GeneratorGroup   @relation(fields: [generatorGroupId], references: [id])
+  maintenanceLogs          MaintenanceLog[]
+}
+
+model GeneratorGroup {
+  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name             String
+  regionId         String            @db.Uuid
+  region           Region            @relation(fields: [regionId], references: [id])
+  generators       Generator[]
+  buildings        Building[]
+  monthlyPrice     MonthlyPrice[]
+  consumptionTypes ConsumptionType[]
+}
+
+model MaintenanceLog {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  generatorId String    @db.Uuid
+  generator   Generator @relation(fields: [generatorId], references: [id])
+  description String
+  performedAt DateTime  @default(now())
+}
+
+model Building {
+  id               String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name             String
+  generatorGroupId String          @db.Uuid
+  generatorGroup   GeneratorGroup  @relation(fields: [generatorGroupId], references: [id])
+  buildingfloors   BuildingFloor[]
+}
+
+model BuildingFloor {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  floorNumber   Int
+  apartmentSide String
+  buildingId    String   @db.Uuid
+  building      Building @relation(fields: [buildingId], references: [id])
+  customer      Customer @relation(fields: [customerId], references: [id])
+  customerId    String   @unique @db.Uuid
+}
+
+model ConsumptionStatus {
+  id                  String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  Status              String
+  customers           Customer[]
+  monthlyConsumptions MonthlyConsumption[]
+}
+
+model Customer {
+  id                  String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firstName           String
+  middleName          String?
+  lastName            String
+  phoneNumber         String?
+  specialMonthlyFee   Float?
+  specialKwhPrice     Float?
+  specialPeriod       Int?
+  isCounter           Boolean
+  status              String
+  description         String?
+  consumptionStatusId String               @db.Uuid
+  consumptionStatus   ConsumptionStatus    @relation(fields: [consumptionStatusId], references: [id])
+  monthlyConsumptions MonthlyConsumption[]
+  consumptionTypeId   String               @db.Uuid
+  consumptionType     ConsumptionType      @relation(fields: [consumptionTypeId], references: [id])
+  buildingFloor       BuildingFloor?
+}
+
+model MonthlyConsumption {
+  id                  String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customerId          String            @db.Uuid
+  customer            Customer          @relation(fields: [customerId], references: [id])
+  previousCounter     Int
+  currentCounter      Int
+  monthlyFee          Float ///////
+  amountPaid          Float
+  kwhPrice            Float
+  note                String?
+  isCut               Boolean
+  consumptionStatusId String            @db.Uuid
+  consumptionStatus   ConsumptionStatus @relation(fields: [consumptionStatusId], references: [id])
+  closedBalance       Boolean
+  date                DateTime
+  monthlyPriceId      String            @db.Uuid
+  monthlyPrice        MonthlyPrice      @relation(fields: [monthlyPriceId], references: [id])
+  consumptionTypeId   String            @db.Uuid
+  consumptionType     ConsumptionType   @relation(fields: [consumptionTypeId], references: [id])
+}
+
+model MonthlyPrice {
+  id                  String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  generatorGroupId    String               @db.Uuid
+  generatorGroup      GeneratorGroup       @relation(fields: [generatorGroupId], references: [id])
+  date                DateTime
+  kwhPrice            Float
+  FixedPricePerAmp    Float
+  monthlyConsumptions MonthlyConsumption[]
+}
+
+model ConsumptionType {
+  id                        String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  description               String
+  Ampere                    Int
+  isCounter                 Boolean
+  ThreePhase                Boolean
+  generatorGroupId          String                    @db.Uuid
+  generatorGroup            GeneratorGroup            @relation(fields: [generatorGroupId], references: [id])
+  consumptionPriceHistories ConsumptionPriceHistory[]
+  monthlyConsumptions       MonthlyConsumption[]
+  customers                 Customer[]
+}
+
+model ConsumptionPriceHistory {
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  consumptionTypeId String          @db.Uuid
+  consumptionType   ConsumptionType @relation(fields: [consumptionTypeId], references: [id])
+  startDate         DateTime
+  endDate           DateTime?
+  price             Float
+}
