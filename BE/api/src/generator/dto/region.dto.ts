@@ -7,12 +7,71 @@ export class CreateRegionDto {
 
 export class UpdateRegionDto extends CreateRegionDto {}
 
+export class CreateGeneratorGroupDto {
+  @ApiProperty()
+  name!: string;
+
+  @ApiProperty({ description: 'UUID of the parent Region' })
+  regionId!: string;
+}
+
+export class CreateGeneratorDto {
+  @ApiProperty()
+  name!: string;
+
+  @ApiProperty({ description: 'UUID of the parent GeneratorGroup' })
+  generatorGroupId!: string;
+
+  @ApiProperty()
+  kvaCapacity!: number;
+
+  @ApiProperty()
+  averageDieselConsumption!: number;
+
+  @ApiProperty({ example: 'active', description: 'active | inactive | maintenance' })
+  status!: string;
+}
+
+export class UpdateGeneratorGroupDto {
+  @ApiProperty({ required: false })
+  name?: string;
+
+  @ApiProperty({ required: false, description: 'UUID of the new parent Region' })
+  regionId?: string;
+}
+
+export class UpdateGeneratorDto {
+  @ApiProperty({ required: false })
+  name?: string;
+
+  @ApiProperty({ required: false, description: 'UUID of the parent GeneratorGroup' })
+  generatorGroupId?: string;
+
+  @ApiProperty({ required: false })
+  kvaCapacity?: number;
+
+  @ApiProperty({ required: false })
+  averageDieselConsumption?: number;
+
+  @ApiProperty({ required: false, example: 'active' })
+  status?: string;
+}
+
 export class GeneratorSummaryDto {
   @ApiProperty()
   id!: string;
 
   @ApiProperty()
   name!: string;
+
+  @ApiProperty()
+  kvaCapacity!: number;
+
+  @ApiProperty()
+  averageDieselConsumption!: number;
+
+  @ApiProperty()
+  status!: string;
 }
 
 export class GeneratorGroupSummaryDto {

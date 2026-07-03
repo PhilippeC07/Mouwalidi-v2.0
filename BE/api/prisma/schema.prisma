@@ -123,6 +123,7 @@ model MonthlyPrice {
   date                DateTime
   kwhPrice            Float
   FixedPricePerAmp    Float
+  isCounter           Boolean              @default(false)
   monthlyConsumptions MonthlyConsumption[]
 }
 

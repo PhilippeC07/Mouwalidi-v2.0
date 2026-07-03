@@ -1,9 +1,13 @@
-import { Body, Controller, Get, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put } from '@nestjs/common';
 import { GeneratorService } from './generator.service.js';
 import {
+  CreateGeneratorDto,
+  CreateGeneratorGroupDto,
   CreateRegionDto,
   GeneratorsResponseDto,
   RegionResponseDto,
+  UpdateGeneratorDto,
+  UpdateGeneratorGroupDto,
   UpdateRegionDto,
 } from './dto/region.dto.js';
 import { ApiBody, ApiTags } from '@nestjs/swagger';
@@ -13,6 +17,7 @@ import { ApiBody, ApiTags } from '@nestjs/swagger';
 export class GeneratorController {
   constructor(private readonly generatorService: GeneratorService) {}
 
+  /* ── Regions ── */
   @Get('regions')
   getAllRegions(): Promise<RegionResponseDto[]> {
     return this.generatorService.getAllRegions();
@@ -30,8 +35,49 @@ export class GeneratorController {
     return this.generatorService.updateRegion(id, body.name);
   }
 
+  @Delete('region/:id')
+  deleteRegion(@Param('id') id: string) {
+    return this.generatorService.deleteRegion(id);
+  }
+
+  /* ── Generator Groups ── */
+  @Post('group')
+  @ApiBody({ type: CreateGeneratorGroupDto })
+  createGeneratorGroup(@Body() body: CreateGeneratorGroupDto) {
+    return this.generatorService.createGeneratorGroup(body.name, body.regionId);
+  }
+
+  @Patch('group/:id')
+  @ApiBody({ type: UpdateGeneratorGroupDto })
+  updateGeneratorGroup(@Param('id') id: string, @Body() body: UpdateGeneratorGroupDto) {
+    return this.generatorService.updateGeneratorGroup(id, body);
+  }
+
+  @Delete('group/:id')
+  deleteGeneratorGroup(@Param('id') id: string) {
+    return this.generatorService.deleteGeneratorGroup(id);
+  }
+
+  /* ── Generators ── */
   @Get('generators')
   getGenerators(): Promise<GeneratorsResponseDto[]> {
     return this.generatorService.getGenerators();
+  }
+
+  @Post()
+  @ApiBody({ type: CreateGeneratorDto })
+  createGenerator(@Body() body: CreateGeneratorDto) {
+    return this.generatorService.createGenerator(body);
+  }
+
+  @Patch(':id')
+  @ApiBody({ type: UpdateGeneratorDto })
+  updateGenerator(@Param('id') id: string, @Body() body: UpdateGeneratorDto) {
+    return this.generatorService.updateGenerator(id, body);
+  }
+
+  @Delete(':id')
+  deleteGenerator(@Param('id') id: string) {
+    return this.generatorService.deleteGenerator(id);
   }
 }

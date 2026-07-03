@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Menu } from 'lucide-react';
 import { Sidebar } from './Sidebar';
+import { RegionsProvider } from '../context/RegionsContext';
 import styles from './app.module.scss';
 
 export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
+    <RegionsProvider>
     <div className={styles.root}>
       {sidebarOpen && (
         <div className={styles.overlay} onClick={() => setSidebarOpen(false)} />
@@ -35,5 +37,6 @@ export function Layout() {
         </div>
       </div>
     </div>
+    </RegionsProvider>
   );
 }

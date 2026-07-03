@@ -3,61 +3,39 @@ import { GeneratorsResponseDto } from '../dto/region.dto.js';
 type GeneratorRow = {
   id: string;
   name: string;
+  status: string;
   averageDieselConsumption: number;
   kvaCapacity: number;
   generatorGroup: {
     id: string;
-    region: {
-      name: string;
-    } | null;
-    buildings: {
-      buildingfloors: {
-        customer: {
-          status: string;
-          consumptionType: {
-            Ampere: number;
-          };
-        } | null;
+    region: { name: string } | null;
+    consumptionTypes: {
+      Ampere: number;
+      customers: {
+        consumptionStatus: { Status: string };
       }[];
     }[];
   } | null;
 };
-export function mapGeneratorsToDto(
-  generators: GeneratorRow[],
-): GeneratorsResponseDto[] {
+
+export function mapGeneratorsToDto(generators: GeneratorRow[]): GeneratorsResponseDto[] {
   return generators.map((gen) => {
-    const totalClients =
-      gen.generatorGroup?.buildings?.flatMap((s) => s.buildingfloors).length ||
-      0;
+    const allCustomers =
+      gen.generatorGroup?.consumptionTypes?.flatMap((ct) =>
+        ct.customers.map((c) => ({ status: c.consumptionStatus.Status, ampere: ct.Ampere })),
+      ) ?? [];
 
-    const totalLoad =
-      gen.generatorGroup?.buildings
-        ?.flatMap((b) =>
-          b.buildingfloors.map((f) => f.customer?.consumptionType?.Ampere ?? 0),
-        )
-        .reduce((sum, amp) => sum + amp, 0) ?? 0;
+    const totalClients = allCustomers.length;
 
-    const totalRevenue = totalClients * 100;
+    const totalLoad = allCustomers.reduce((sum, c) => sum + c.ampere, 0);
 
-    const overdueCount =
-      gen.generatorGroup?.buildings
-        ?.flatMap((b) =>
-          b.buildingfloors.map((f) =>
-            f.customer?.status === 'overdue' ? 1 : 0,
-          ),
-        )
-        ?.reduce((sum, amp) => sum + amp, 0 as number) ?? 0;
+    const overdueCount = allCustomers.filter(
+      (c) => c.status.toLowerCase() === 'overdue',
+    ).length;
 
-    const unpaidCount =
-      gen.generatorGroup?.buildings
-        ?.flatMap((b) =>
-          b.buildingfloors.map((f) =>
-            f.customer?.status === 'unpaid' ? 1 : 0,
-          ),
-        )
-        ?.reduce((sum, amp) => sum + amp, 0 as number) ?? 0;
-
-    const monthlyBill = 10000;
+    const unpaidCount = allCustomers.filter(
+      (c) => c.status.toLowerCase() === 'unpaid',
+    ).length;
 
     return {
       id: gen.id,
@@ -65,13 +43,13 @@ export function mapGeneratorsToDto(
       location: gen.generatorGroup?.region?.name ?? 'Unknown',
       kvaCapacity: gen.kvaCapacity,
       averageDieselConsumption: gen.averageDieselConsumption,
-      status: 'running',
+      status: gen.status,
       totalClients,
       totalLoad,
-      totalRevenue,
+      totalRevenue: 0,
       overdueCount,
       unpaidCount,
-      monthlyBill,
+      monthlyBill: 0,
     };
   });
 }

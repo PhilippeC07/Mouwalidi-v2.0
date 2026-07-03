@@ -1,0 +1,316 @@
+.page {
+  flex: 1;
+  overflow-y: auto;
+  background: #111827;
+  display: flex;
+  flex-direction: column;
+}
+
+.page::-webkit-scrollbar { width: 6px; }
+.page::-webkit-scrollbar-track { background: transparent; }
+.page::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+
+/* ── Loading / error states ── */
+.centerState {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.stateText { color: #6b7280; font-size: 0.9rem; }
+.stateErr  { color: #f87171; font-size: 0.9rem; }
+
+/* ── Header ── */
+.header {
+  background: #030712;
+  border-bottom: 1px solid #1f2937;
+  padding: 16px 24px 20px;
+  flex-shrink: 0;
+}
+
+.backBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: #6b7280;
+  font-size: 0.8rem;
+  cursor: pointer;
+  margin-bottom: 14px;
+  padding: 0;
+  transition: color 0.15s;
+}
+.backBtn:hover { color: #e5e7eb; }
+
+.headerBody {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #1e3a5f, #1e3348);
+  border: 1px solid #1e40af;
+  color: #60a5fa;
+  font-size: 1.1rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.headerInfo { display: flex; flex-direction: column; gap: 8px; }
+
+.name {
+  color: #fff;
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* ── Badges ── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 999px;
+  text-transform: capitalize;
+}
+
+.badgeActive   { background: rgba(96,165,250,0.15); color: #60a5fa; }
+.badgeInactive { background: rgba(107,114,128,0.15); color: #9ca3af; }
+.badgePaid     { background: rgba(52,211,153,0.15); color: #34d399; }
+.badgeUnpaid   { background: rgba(251,191,36,0.15); color: #fbbf24; }
+.badgeOverdue  { background: rgba(248,113,113,0.15); color: #f87171; }
+.badgeCounter  { background: rgba(52,211,153,0.1); color: #34d399; }
+.badgePhase    { background: rgba(167,139,250,0.15); color: #a78bfa; }
+
+/* ── Info Strip ── */
+.infoStrip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  background: #1f2937;
+  border-bottom: 1px solid #1f2937;
+  flex-shrink: 0;
+}
+
+.infoCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  background: #030712;
+  flex: 1;
+  min-width: 160px;
+}
+
+.infoCardWide { flex: 2; min-width: 260px; }
+
+.infoCardIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: #111827;
+  border: 1px solid #1f2937;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.infoLabel { color: #6b7280; font-size: 0.72rem; margin: 0 0 3px; text-transform: uppercase; letter-spacing: 0.04em; }
+.infoValue { color: #e5e7eb; font-size: 0.875rem; font-weight: 500; margin: 0; }
+
+/* ── Content (monthly table) ── */
+.content {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sectionTitle {
+  color: #e5e7eb;
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.sectionCount {
+  background: #1f2937;
+  color: #6b7280;
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.empty {
+  color: #6b7280;
+  font-size: 0.875rem;
+  text-align: center;
+  padding: 40px 0;
+}
+
+/* ── Table ── */
+.tableWrap {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid #1f2937;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.table th {
+  text-align: left;
+  padding: 10px 12px;
+  background: #1f2937;
+  color: #6b7280;
+  font-weight: 500;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 10px 12px;
+  border-top: 1px solid #111827;
+  color: #d1d5db;
+  white-space: nowrap;
+}
+
+.rowPaid   td { background: #030712; }
+.rowUnpaid td { background: #0a0d14; }
+.table tbody tr:hover td { background: #111827 !important; }
+
+/* ── Cell variants ── */
+.monthCell  { color: #9ca3af !important; font-size: 0.8rem; }
+.numCell    { font-variant-numeric: tabular-nums; text-align: right; }
+.iconCell   { text-align: center; }
+
+.usagePositive { color: #60a5fa; font-weight: 600; }
+.usageZero     { color: #4b5563; }
+
+.balanceVal    { color: #e5e7eb; font-weight: 600; }
+.paidVal       { color: #34d399; }
+.remainingDue  { color: #f87171; font-weight: 600; }
+.remainingClear { color: #4b5563; }
+
+/* Status pill inline in table */
+.statusPill {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 999px;
+  text-transform: capitalize;
+}
+
+/* ── Formula note ── */
+.formulaNote {
+  color: #4b5563;
+  font-size: 0.75rem;
+  font-style: italic;
+  margin: 0;
+  padding: 0 4px;
+}
+
+/* ── Save error (inline in section header) ── */
+.saveErrorInline {
+  margin-left: auto;
+  color: #f87171;
+  font-size: 0.75rem;
+  background: rgba(248, 113, 113, 0.08);
+  border: 1px solid rgba(248, 113, 113, 0.2);
+  border-radius: 6px;
+  padding: 3px 10px;
+}
+
+/* ── Always-on editable inputs ── */
+
+/* Number inputs: invisible by default, reveal border on hover/focus */
+.cellInput {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: #d1d5db;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  padding: 3px 6px;
+  outline: none;
+  width: 84px;
+  transition: border-color 0.15s, background 0.15s;
+  /* hide browser spin buttons */
+  -moz-appearance: textfield;
+}
+.cellInput::-webkit-outer-spin-button,
+.cellInput::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+.cellInput:hover {
+  border-color: #374151;
+  background: #0d1118;
+}
+.cellInput:focus {
+  border-color: #3b82f6;
+  background: #0d1118;
+  color: #e5e7eb;
+}
+
+/* Status select: minimal styling */
+.cellSelect {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: #d1d5db;
+  font-size: 0.78rem;
+  padding: 3px 4px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  max-width: 110px;
+}
+.cellSelect:hover {
+  border-color: #374151;
+  background: #0d1118;
+}
+.cellSelect:focus {
+  border-color: #3b82f6;
+  background: #0d1118;
+}
+.cellSelect option { background: #1f2937; }
+
+/* Checkboxes */
+.cellCheck {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  accent-color: #3b82f6;
+}
