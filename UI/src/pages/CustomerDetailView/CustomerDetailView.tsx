@@ -236,17 +236,17 @@ export function CustomerDetailView() {
               <thead>
                 <tr>
                   <th>Month</th>
-                  {isCounter && <th>Prev Counter</th>}
-                  {isCounter && <th>Curr Counter</th>}
-                  {isCounter && <th>Usage (kWh)</th>}
-                  {isCounter && <th>kWh Price</th>}
-                  <th>Monthly Fee</th>
-                  <th>Balance</th>
-                  <th>Paid</th>
-                  <th>Remaining</th>
+                  {isCounter && <th className={styles.numCell}>Prev Counter</th>}
+                  {isCounter && <th className={styles.numCell}>Curr Counter</th>}
+                  {isCounter && <th className={styles.numCell}>Usage (kWh)</th>}
+                  {isCounter && <th className={styles.numCell}>kWh Price</th>}
+                  <th className={styles.numCell}>Monthly Fee</th>
+                  <th className={styles.numCell}>Balance</th>
+                  <th className={styles.numCell}>Paid</th>
+                  <th className={styles.numCell}>Remaining</th>
                   <th>Status</th>
-                  <th>Cut</th>
-                  <th>Closed</th>
+                  <th className={styles.iconCell}>Cut</th>
+                  <th className={styles.iconCell}>Closed</th>
                 </tr>
               </thead>
               <tbody>
@@ -260,10 +260,6 @@ export function CustomerDetailView() {
                   const usage       = currCounter - prevCounter;
                   const balance     = isCounter ? usage * m.kwhPrice + fee : fee;
                   const remaining   = balance - paid;
-
-                  const statusLabel = statuses.find(s => s.id === row.consumptionStatusId)?.Status
-                    ?? m.consumptionStatus.Status;
-                  const payS = statusLabel.toLowerCase();
 
                   return (
                     <tr key={m.id} className={remaining > 0 ? styles.rowUnpaid : styles.rowPaid}>

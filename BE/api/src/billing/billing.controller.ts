@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBody, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { BillingService } from './billing.service.js';
-import { CreateMonthlyBillingDto, MonthlyCustomerEntryDto, MonthlySummaryDto, UpdateMonthlyConsumptionDto } from './dto/billing.dto.js';
+import { BulkUpdateCountersDto, CreateMonthlyBillingDto, CustomerBalanceDto, MonthlyCounterEntryDto, MonthlyCustomerEntryDto, MonthlySummaryDto, UpdateMonthlyConsumptionDto } from './dto/billing.dto.js';
 
 @ApiTags('Billing')
 @Controller('billing')
@@ -25,6 +25,32 @@ export class BillingController {
   @ApiQuery({ name: 'month', required: true })
   getMonthlyPayments(@Query('month') month: string): Promise<MonthlyCustomerEntryDto[]> {
     return this.billingService.getMonthlyPayments(month);
+  }
+
+  @Get('monthly/balances')
+  @ApiQuery({ name: 'month', required: true })
+  @ApiQuery({ name: 'generatorGroupId', required: true })
+  getMonthlyCustomerBalances(
+    @Query('month') month: string,
+    @Query('generatorGroupId') generatorGroupId: string,
+  ): Promise<CustomerBalanceDto[]> {
+    return this.billingService.getMonthlyCustomerBalances(month, generatorGroupId);
+  }
+
+  @Get('monthly/counters')
+  @ApiQuery({ name: 'month', required: true })
+  @ApiQuery({ name: 'generatorGroupId', required: true })
+  getMonthlyCounterEntries(
+    @Query('month') month: string,
+    @Query('generatorGroupId') generatorGroupId: string,
+  ): Promise<MonthlyCounterEntryDto[]> {
+    return this.billingService.getMonthlyCounterEntries(month, generatorGroupId);
+  }
+
+  @Patch('monthly/bulk-counters')
+  @ApiBody({ type: BulkUpdateCountersDto })
+  bulkUpdateCounters(@Body() body: BulkUpdateCountersDto) {
+    return this.billingService.bulkUpdateCounters(body.updates);
   }
 
   @Post('monthly')

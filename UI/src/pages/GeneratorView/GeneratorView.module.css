@@ -63,6 +63,7 @@
   white-space: nowrap;
 }
 .exportBtn:hover { background-color: var(--accent-bg3); }
+.exportBtn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* Load bar */
 .loadBarSection  { margin-top: 16px; }
@@ -145,6 +146,9 @@
 .filterBtns { display: flex; gap: 8px; flex-wrap: wrap; }
 
 .filterBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 8px 12px;
   border-radius: 12px;
   border: 1px solid var(--br);
@@ -281,6 +285,69 @@
 
 /* Empty state */
 .emptyRow td { padding: 40px 20px; text-align: center; color: var(--tx-5); }
+
+/* ── Scrollable table panes ── */
+.tableScroll.scrollPane { max-height: 65vh; overflow-y: auto; }
+.tableScroll.scrollPane thead { position: sticky; top: 0; z-index: 2; }
+.th { background-color: var(--bg-0); }
+
+.scrollPane::-webkit-scrollbar { width: 6px; }
+.scrollPane::-webkit-scrollbar-track { background: transparent; }
+.scrollPane::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 3px; }
+
+/* ── Column sort / filter ── */
+.sortIconIdle { opacity: 0.35; }
+
+.colFilterRow th { background-color: var(--bg-2); padding: 6px 10px; }
+
+.colFilterInput {
+  width: 100%; box-sizing: border-box; background: var(--bg-0); border: 1px solid var(--br);
+  border-radius: 5px; color: var(--tx-1); font-size: 0.75rem; padding: 4px 7px; outline: none;
+  font-weight: 400;
+}
+.colFilterInput:focus { border-color: rgba(250, 204, 21, 0.5); }
+select.colFilterInput { cursor: pointer; }
+
+.clearFiltersBtn {
+  background: none; border: 1px solid var(--br); border-radius: 5px; color: var(--tx-4);
+  font-size: 0.7rem; padding: 3px 8px; cursor: pointer; white-space: nowrap; transition: background 0.15s, color 0.15s;
+}
+.clearFiltersBtn:hover { background: var(--bg-3); color: var(--tx-1); }
+
+/* ── Remaining balance ── */
+.remainingOwing { color: #f87171; font-weight: 600; font-variant-numeric: tabular-nums; }
+.remainingPaid  { color: #34d399; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+.groupRemainingOwing, .groupRemainingPaid {
+  font-size: 0.75rem; font-weight: 600; padding: 2px 9px; border-radius: 999px;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.groupRemainingOwing { background: rgba(248, 113, 113, 0.12); color: #f87171; }
+.groupRemainingPaid  { background: rgba(52, 211, 153, 0.12); color: #34d399; }
+
+/* ── Grouped list (By Building / By Subscription Type views) ── */
+.buildingList { display: flex; flex-direction: column; gap: 12px; }
+.buildingList.scrollPane { max-height: 65vh; overflow-y: auto; padding-right: 4px; }
+
+.buildingCard { background: var(--bg-2); border: 1px solid var(--br); border-radius: 8px; overflow: hidden; flex-shrink: 0; }
+
+.buildingToggle {
+  width: 100%; display: flex; align-items: center; gap: 10px; padding: 14px 16px;
+  background: none; border: none; cursor: pointer; transition: background 0.15s; text-align: left; min-width: 0;
+}
+.buildingToggle:hover { background: var(--bg-3); }
+
+.buildingName       { color: var(--tx-1); font-size: 0.95rem; font-weight: 500; }
+.buildingFloorCount { color: var(--tx-4); font-size: 0.8rem; }
+
+.buildingFloors { border-top: 1px solid var(--br); padding: 0 8px 8px; }
+
+.floorTable { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.floorTable th { text-align: left; padding: 8px 12px; color: var(--tx-4); font-weight: 500; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.floorTable td { padding: 8px 12px; color: var(--tx-2); border-top: 1px solid var(--br); }
+
+/* ── View switcher ── */
+.viewSwitcher { display: flex; align-items: center; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
 
 /* Manage / type / building / customer buttons */
 .manageBtn {

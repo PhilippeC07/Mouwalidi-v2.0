@@ -122,3 +122,54 @@ export const updateMonthlyConsumption = async (
 ): Promise<void> => {
   await api.patch(`/billing/monthly/${id}`, payload);
 };
+
+export interface MonthlyCounterEntry {
+  consumptionId: string;
+  customerId: string;
+  customerName: string;
+  groupName: string;
+  regionName: string;
+  previousCounter: number;
+  currentCounter: number;
+  kwhPrice: number;
+  closedBalance: boolean;
+}
+
+export interface CounterUpdateItem {
+  consumptionId: string;
+  currentCounter: number;
+}
+
+export const getMonthlyCounterEntries = async (
+  generatorGroupId: string,
+  month: string,
+): Promise<MonthlyCounterEntry[]> => {
+  const { data } = await api.get<MonthlyCounterEntry[]>('/billing/monthly/counters', {
+    params: { generatorGroupId, month },
+  });
+  return data;
+};
+
+export const bulkUpdateCounters = async (updates: CounterUpdateItem[]): Promise<{ updated: number }> => {
+  const { data } = await api.patch<{ updated: number }>('/billing/monthly/bulk-counters', { updates });
+  return data;
+};
+
+export interface CustomerBalance {
+  customerId: string;
+  consumptionId: string;
+  balance: number;
+  amountPaid: number;
+  remaining: number;
+  closedBalance: boolean;
+}
+
+export const getMonthlyCustomerBalances = async (
+  generatorGroupId: string,
+  month: string,
+): Promise<CustomerBalance[]> => {
+  const { data } = await api.get<CustomerBalance[]>('/billing/monthly/balances', {
+    params: { generatorGroupId, month },
+  });
+  return data;
+};

@@ -77,7 +77,7 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
         </div>
       </div>
 
-      <nav className={styles.nav}>
+      <div className={styles.topSection}>
         <p className={styles.sectionLabel}>Navigation</p>
 
         <NavLink
@@ -91,9 +91,11 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
           <BarChart3 size={16} />
           <span>Overview</span>
         </NavLink>
+      </div>
 
+      <nav className={styles.nav}>
         <div className={styles.regionList}>
-          <p className={styles.sectionLabel} style={{ marginTop: 12 }}>
+          <p className={styles.sectionLabel}>
             Generators
           </p>
 
@@ -229,39 +231,39 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
               );
             })}
         </div>
-
-        {/* ── Accounting ── */}
-        <div className={styles.accountingSection}>
-          <p className={styles.sectionLabel} style={{ marginTop: 12 }}>Accounting</p>
-
-          <NavLink
-            to="/accounting/summary"
-            className={({ isActive }) => `${styles.navBtn} ${isActive ? styles.navBtnActive : ''}`}
-            onClick={handleNavigate}
-          >
-            <BarChart3 size={15} />
-            <span>Summary</span>
-          </NavLink>
-
-          <NavLink
-            to="/accounting/receivables"
-            className={({ isActive }) => `${styles.navBtn} ${isActive ? styles.navBtnActive : ''}`}
-            onClick={handleNavigate}
-          >
-            <BookOpen size={15} />
-            <span>Receivables</span>
-          </NavLink>
-
-          <NavLink
-            to="/accounting/payments"
-            className={({ isActive }) => `${styles.navBtn} ${isActive ? styles.navBtnActive : ''}`}
-            onClick={handleNavigate}
-          >
-            <CreditCard size={15} />
-            <span>Payments</span>
-          </NavLink>
-        </div>
       </nav>
+
+      {/* ── Accounting ── */}
+      <div className={styles.accountingSection}>
+        <p className={styles.sectionLabel}>Accounting</p>
+
+        <NavLink
+          to="/accounting/summary"
+          className={({ isActive }) => `${styles.navBtn} ${isActive ? styles.navBtnActive : ''}`}
+          onClick={handleNavigate}
+        >
+          <BarChart3 size={15} />
+          <span>Summary</span>
+        </NavLink>
+
+        <NavLink
+          to="/accounting/receivables"
+          className={({ isActive }) => `${styles.navBtn} ${isActive ? styles.navBtnActive : ''}`}
+          onClick={handleNavigate}
+        >
+          <BookOpen size={15} />
+          <span>Receivables</span>
+        </NavLink>
+
+        <NavLink
+          to="/accounting/payments"
+          className={({ isActive }) => `${styles.navBtn} ${isActive ? styles.navBtnActive : ''}`}
+          onClick={handleNavigate}
+        >
+          <CreditCard size={15} />
+          <span>Payments</span>
+        </NavLink>
+      </div>
 
       <div className={styles.bottom}>
         <NavLink

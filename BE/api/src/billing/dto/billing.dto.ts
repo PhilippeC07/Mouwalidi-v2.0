@@ -68,6 +68,37 @@ export class MonthlyCustomerEntryDto {
   @ApiProperty() closedBalance!: boolean;
 }
 
+export class CustomerBalanceDto {
+  @ApiProperty() customerId!: string;
+  @ApiProperty() consumptionId!: string;
+  @ApiProperty() balance!: number;
+  @ApiProperty() amountPaid!: number;
+  @ApiProperty() remaining!: number;
+  @ApiProperty() closedBalance!: boolean;
+}
+
+export class MonthlyCounterEntryDto {
+  @ApiProperty() consumptionId!: string;
+  @ApiProperty() customerId!: string;
+  @ApiProperty() customerName!: string;
+  @ApiProperty() groupName!: string;
+  @ApiProperty() regionName!: string;
+  @ApiProperty() previousCounter!: number;
+  @ApiProperty() currentCounter!: number;
+  @ApiProperty() kwhPrice!: number;
+  @ApiProperty() closedBalance!: boolean;
+}
+
+export class CounterUpdateItemDto {
+  @ApiProperty() consumptionId!: string;
+  @ApiProperty() currentCounter!: number;
+}
+
+export class BulkUpdateCountersDto {
+  @ApiProperty({ type: [CounterUpdateItemDto] })
+  updates!: CounterUpdateItemDto[];
+}
+
 export class UpdateMonthlyConsumptionDto {
   @ApiProperty({ required: false })
   previousCounter?: number;

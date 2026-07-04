@@ -46,12 +46,22 @@
   margin: 0;
 }
 
-/* ── Navigation ── */
+/* ── Top navigation (fixed) ── */
+.topSection {
+  flex-shrink: 0;
+  min-width: 0;
+  padding: 16px 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* ── Navigation (scrollable) ── */
 .nav {
   flex: 1;
   min-height: 0;
   min-width: 0;
-  padding: 16px 12px;
+  padding: 8px 12px 16px;
   overflow-y: auto;
   overflow-x: hidden;
   display: flex;
@@ -286,15 +296,15 @@
 .statusAmber { background-color: #fbbf24; }
 .statusRed   { background-color: #f87171; }
 
-/* ── Accounting section ── */
+/* ── Accounting section (fixed) ── */
 .accountingSection {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  flex-shrink: 0;
   border-top: 1px solid var(--br);
-  padding-top: 8px;
-  margin-top: 8px;
+  padding: 8px 12px 12px;
 }
 
 /* ── Loading / error ── */

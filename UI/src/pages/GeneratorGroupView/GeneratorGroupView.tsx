@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   Users,
@@ -12,6 +12,12 @@ import {
   Pencil,
   X,
   Settings,
+  Search,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  ChevronsUpDown,
+  Table2,
 } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { getGeneratorStatusStyle } from '../../app/data/mockData';
@@ -20,9 +26,32 @@ import { useRegions } from '../../hooks/useGetRegions';
 import { useConsumptionLookups } from '../../hooks/useConsumptionLookups';
 import { useCustomers } from '../../hooks/useCustomers';
 import { useBuildings } from '../../hooks/useBuildings';
-import { createCustomer, updateCustomer, createConsumptionType, type CustomerListItem } from '../../api/customer/customer.api';
+import { useCustomerBalances } from '../../hooks/useCustomerBalances';
+import { createCustomer, updateCustomer, createConsumptionType, type CustomerListItem, type ConsumptionTypeDto } from '../../api/customer/customer.api';
 import { createBuilding } from '../../api/building/building.api';
 import styles from '../GeneratorView/GeneratorView.module.css';
+
+type CustomerView = 'table' | 'byBuilding' | 'byType';
+type SortDir = 'asc' | 'desc';
+type CustomerSortKey = 'name' | 'phone' | 'type' | 'ampere' | 'phase' | 'paymentStatus' | 'building' | 'status' | 'remaining';
+
+interface CustomerColumnFilters {
+  name: string; phone: string; type: string; phase: string;
+  paymentStatus: string; building: string; status: string; balance: string;
+}
+
+const EMPTY_CUSTOMER_FILTERS: CustomerColumnFilters = {
+  name: '', phone: '', type: '', phase: '', paymentStatus: '', building: '', status: '', balance: '',
+};
+
+function fullName(c: { firstName: string; middleName: string | null; lastName: string }) {
+  return [c.firstName, c.middleName, c.lastName].filter(Boolean).join(' ');
+}
+
+function csvEscape(value: string | number): string {
+  const s = String(value);
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
 
 interface CustomerForm {
   firstName: string;
@@ -74,6 +103,18 @@ export function GeneratorGroupView() {
   const [typeForm, setTypeForm] = useState({ description: '', Ampere: '', isCounter: false, ThreePhase: false });
   const [typeSubmitting, setTypeSubmitting] = useState(false);
   const [typeError, setTypeError] = useState<string | null>(null);
+
+  const currentMonth = useMemo(() => new Date().toISOString().slice(0, 7), []);
+  const { data: balances } = useCustomerBalances(groupId, currentMonth);
+
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [buildingSearch, setBuildingSearch] = useState('');
+  const [buildingSort, setBuildingSort] = useState<'name-asc' | 'name-desc' | 'floors-desc' | 'floors-asc'>('name-asc');
+
+  const [customerView, setCustomerView] = useState<CustomerView>('table');
+  const [sortKey, setSortKey] = useState<CustomerSortKey | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [colFilters, setColFilters] = useState<CustomerColumnFilters>(EMPTY_CUSTOMER_FILTERS);
 
   const loading = genLoading || regLoading;
   const error = genError ?? regError;
@@ -167,6 +208,159 @@ export function GeneratorGroupView() {
   const paidCount = totalClients - overdueCount - unpaidCount;
   const genStatusStyle = getGeneratorStatusStyle(groupStatus);
 
+  const buildingNameById = new Map(buildings.map((b) => [b.id, b.name]));
+  const balanceByCustomerId = new Map(balances.map((b) => [b.customerId, b]));
+
+  function buildingNameOf(c: CustomerListItem): string {
+    return c.buildingFloor ? (buildingNameById.get(c.buildingFloor.buildingId) ?? '') : '';
+  }
+
+  function remainingOf(c: CustomerListItem): number | null {
+    return balanceByCustomerId.get(c.id)?.remaining ?? null;
+  }
+
+  function renderRemaining(c: CustomerListItem) {
+    const remaining = remainingOf(c);
+    if (remaining === null) return <span className={styles.tdGray}>—</span>;
+    if (remaining <= 0.001) return <span className={styles.remainingPaid}>${remaining.toFixed(2)}</span>;
+    return <span className={styles.remainingOwing}>${remaining.toFixed(2)}</span>;
+  }
+
+  function sumRemaining(items: CustomerListItem[]): number {
+    return items.reduce((sum, c) => sum + (remainingOf(c) ?? 0), 0);
+  }
+
+  function renderGroupRemainingBadge(totalRemaining: number) {
+    return (
+      <span className={totalRemaining > 0.001 ? styles.groupRemainingOwing : styles.groupRemainingPaid}>
+        ${totalRemaining.toFixed(2)} remaining
+      </span>
+    );
+  }
+
+  function toggleSort(key: CustomerSortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  }
+
+  function renderSortHeader(label: string, sortKeyName: CustomerSortKey) {
+    const active = sortKey === sortKeyName;
+    return (
+      <button type="button" className={styles.sortBtn} onClick={() => toggleSort(sortKeyName)}>
+        {label}
+        {active
+          ? (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)
+          : <ChevronsUpDown size={12} className={styles.sortIconIdle} />}
+      </button>
+    );
+  }
+
+  function toggleGroup(key: string) {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }
+
+  function billStyleFor(status: string) {
+    const s = status.toLowerCase();
+    return s === 'paid'
+      ? { background: 'rgba(52,211,153,0.1)', color: '#34d399', border: '1px solid rgba(52,211,153,0.2)' }
+      : s === 'overdue'
+        ? { background: 'rgba(248,113,113,0.1)', color: '#f87171', border: '1px solid rgba(248,113,113,0.2)' }
+        : { background: 'rgba(251,191,36,0.1)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.2)' };
+  }
+
+  const filteredBuildings = (() => {
+    const q = buildingSearch.trim().toLowerCase();
+    const list = q ? buildings.filter((b) => b.name.toLowerCase().includes(q)) : [...buildings];
+    list.sort((a, b) => {
+      switch (buildingSort) {
+        case 'name-desc': return b.name.localeCompare(a.name);
+        case 'floors-desc': return b.floorCount - a.floorCount;
+        case 'floors-asc': return a.floorCount - b.floorCount;
+        default: return a.name.localeCompare(b.name);
+      }
+    });
+    return list;
+  })();
+
+  const filteredSortedCustomers = (() => {
+    const nameQ = colFilters.name.trim().toLowerCase();
+    const phoneQ = colFilters.phone.trim().toLowerCase();
+    let list = customers.filter((c) => {
+      if (nameQ && !fullName(c).toLowerCase().includes(nameQ)) return false;
+      if (phoneQ && !(c.phoneNumber ?? '').toLowerCase().includes(phoneQ)) return false;
+      if (colFilters.type && c.consumptionTypeId !== colFilters.type) return false;
+      if (colFilters.phase && (colFilters.phase === '3' ? !c.consumptionType.ThreePhase : c.consumptionType.ThreePhase)) return false;
+      if (colFilters.paymentStatus && c.consumptionStatusId !== colFilters.paymentStatus) return false;
+      if (colFilters.building && buildingNameOf(c) !== colFilters.building) return false;
+      if (colFilters.status && c.status !== colFilters.status) return false;
+      if (colFilters.balance) {
+        const remaining = remainingOf(c);
+        if (colFilters.balance === 'owing' && !(remaining !== null && remaining > 0.001)) return false;
+        if (colFilters.balance === 'paid' && !(remaining !== null && remaining <= 0.001)) return false;
+        if (colFilters.balance === 'nobill' && remaining !== null) return false;
+      }
+      return true;
+    });
+    if (sortKey) {
+      const dir = sortDir === 'asc' ? 1 : -1;
+      list = [...list].sort((a, b) => {
+        let av: string | number;
+        let bv: string | number;
+        switch (sortKey) {
+          case 'name': av = fullName(a).toLowerCase(); bv = fullName(b).toLowerCase(); break;
+          case 'phone': av = a.phoneNumber ?? ''; bv = b.phoneNumber ?? ''; break;
+          case 'type': av = a.consumptionType.description.toLowerCase(); bv = b.consumptionType.description.toLowerCase(); break;
+          case 'ampere': av = a.consumptionType.Ampere; bv = b.consumptionType.Ampere; break;
+          case 'phase': av = a.consumptionType.ThreePhase ? 1 : 0; bv = b.consumptionType.ThreePhase ? 1 : 0; break;
+          case 'paymentStatus': av = a.consumptionStatus.Status.toLowerCase(); bv = b.consumptionStatus.Status.toLowerCase(); break;
+          case 'building': av = buildingNameOf(a).toLowerCase(); bv = buildingNameOf(b).toLowerCase(); break;
+          case 'status': av = a.status; bv = b.status; break;
+          case 'remaining': av = remainingOf(a) ?? -Infinity; bv = remainingOf(b) ?? -Infinity; break;
+        }
+        if (av < bv) return -1 * dir;
+        if (av > bv) return 1 * dir;
+        return 0;
+      });
+    }
+    return list;
+  })();
+
+  const customersByBuilding = (() => {
+    const groups = new Map<string, { label: string; items: CustomerListItem[] }>();
+    for (const c of customers) {
+      const key = c.buildingFloor?.buildingId ?? '__unassigned__';
+      const label = c.buildingFloor ? (buildingNameById.get(c.buildingFloor.buildingId) ?? 'Unknown building') : 'Unassigned';
+      if (!groups.has(key)) groups.set(key, { label, items: [] });
+      groups.get(key)!.items.push(c);
+    }
+    return Array.from(groups.entries())
+      .map(([key, g]) => ({ key, ...g, totalRemaining: sumRemaining(g.items) }))
+      .sort((a, b) => (a.key === '__unassigned__' ? 1 : b.key === '__unassigned__' ? -1 : a.label.localeCompare(b.label)));
+  })();
+
+  const customersByType = (() => {
+    const groups = new Map<string, { type: ConsumptionTypeDto | undefined; label: string; items: CustomerListItem[] }>();
+    for (const c of customers) {
+      const key = c.consumptionTypeId;
+      if (!groups.has(key)) {
+        const type = types.find((t) => t.id === key);
+        groups.set(key, { type, label: c.consumptionType.description, items: [] });
+      }
+      groups.get(key)!.items.push(c);
+    }
+    return Array.from(groups.entries())
+      .map(([key, g]) => ({ key, ...g, totalRemaining: sumRemaining(g.items) }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  })();
+
   function openEditModal(c: CustomerListItem) {
     setForm({
       firstName: c.firstName,
@@ -249,6 +443,42 @@ export function GeneratorGroupView() {
     } finally {
       setBuildingSubmitting(false);
     }
+  }
+
+  function handleExportReport() {
+    const headers = [
+      'Name', 'Building', 'Floor', 'Subscription Type', 'Ampere', 'Phase',
+      'Counter', 'Bill Status', 'Status', 'Remaining',
+    ];
+    const rows = customers.map((c) => {
+      const remaining = remainingOf(c);
+      return [
+        fullName(c),
+        c.buildingFloor ? buildingNameOf(c) : '',
+        c.buildingFloor ? `Floor ${c.buildingFloor.floorNumber} ${c.buildingFloor.apartmentSide}` : '',
+        c.consumptionType.description,
+        c.consumptionType.Ampere,
+        c.consumptionType.ThreePhase ? '3-Phase' : '1-Phase',
+        c.isCounter ? 'Yes' : 'No',
+        c.consumptionStatus.Status,
+        c.status,
+        remaining === null ? '' : remaining.toFixed(2),
+      ];
+    });
+    const csvContent = [headers, ...rows]
+      .map((row) => row.map(csvEscape).join(','))
+      .join('\r\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const safeGroupName = groupLabel.replace(/[^a-z0-9]+/gi, '-').toLowerCase().replace(/^-+|-+$/g, '');
+    a.href = url;
+    a.download = `${safeGroupName || 'group'}-report-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 
   return (
@@ -599,7 +829,7 @@ export function GeneratorGroupView() {
               <UserPlus size={16} />
               Add Customer
             </button>
-            <button className={styles.exportBtn}>
+            <button className={styles.exportBtn} onClick={handleExportReport} disabled={customers.length === 0}>
               <Download size={16} />
               Export Report
             </button>
@@ -670,93 +900,122 @@ export function GeneratorGroupView() {
           </div>
         </div>
 
-        {/* Buildings table */}
-        <div className={styles.tableCard}>
-          <div className={styles.tableScroll}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th className={styles.th}>Building</th>
-                  <th className={`${styles.th} ${styles.thCenter}`}>Floors / Units</th>
-                </tr>
-              </thead>
-              <tbody>
-                {buildingsLoading ? (
-                  <tr className={styles.emptyRow}>
-                    <td colSpan={2}>Loading buildings…</td>
-                  </tr>
-                ) : buildings.length === 0 ? (
-                  <tr className={styles.emptyRow}>
-                    <td colSpan={2}>No buildings yet. Add the first one.</td>
-                  </tr>
-                ) : (
-                  buildings.map((b) => (
-                    <tr key={b.id} className={styles.tr}>
-                      <td className={styles.td}>
-                        <div className={styles.clientNameCell}>
-                          <div className={styles.avatar}>
-                            <Building2 size={14} color="#9ca3af" />
-                          </div>
-                          <span className={styles.clientName}>{b.name}</span>
-                        </div>
-                      </td>
-                      <td className={`${styles.td} ${styles.tdCenter} ${styles.tdGray}`}>
-                        {b.floorCount}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
         {/* Customer table */}
-        <div className={styles.tableCard}>
-          <div className={styles.tableScroll}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th className={styles.th}>Customer</th>
-                  <th className={styles.th}>Phone</th>
-                  <th className={styles.th}>Subscription</th>
-                  <th className={styles.th}>Bill Status</th>
-                  <th className={styles.th}>Status</th>
-                  <th className={`${styles.th} ${styles.thCenter}`}>Counter</th>
-                  <th className={styles.th} />
-                </tr>
-              </thead>
-              <tbody>
-                {customersLoading ? (
-                  <tr className={styles.emptyRow}>
-                    <td colSpan={7}>Loading customers…</td>
+        {!customersLoading && customers.length > 0 && (
+          <div className={styles.viewSwitcher}>
+            <button className={`${styles.filterBtn} ${customerView === 'table' ? styles.filterBtnActive : ''}`} onClick={() => setCustomerView('table')}>
+              <Table2 size={13} /> Table
+            </button>
+            <button className={`${styles.filterBtn} ${customerView === 'byBuilding' ? styles.filterBtnActive : ''}`} onClick={() => setCustomerView('byBuilding')}>
+              <Building2 size={13} /> By Building
+            </button>
+            <button className={`${styles.filterBtn} ${customerView === 'byType' ? styles.filterBtnActive : ''}`} onClick={() => setCustomerView('byType')}>
+              <Zap size={13} /> By Subscription Type
+            </button>
+          </div>
+        )}
+
+        {customersLoading ? (
+          <div className={styles.tableCard}>
+            <p className={styles.empty} style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--tx-5)' }}>Loading customers…</p>
+          </div>
+        ) : customers.length === 0 ? (
+          <div className={styles.tableCard}>
+            <p style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--tx-5)' }}>No customers yet. Add the first one.</p>
+          </div>
+        ) : customerView === 'table' ? (
+          <div className={styles.tableCard}>
+            <div className={`${styles.tableScroll} ${styles.scrollPane}`}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th className={styles.th}>{renderSortHeader('Customer', 'name')}</th>
+                    <th className={styles.th}>{renderSortHeader('Building', 'building')}</th>
+                    <th className={styles.th}>{renderSortHeader('Subscription', 'type')}</th>
+                    <th className={styles.th}>{renderSortHeader('Bill Status', 'paymentStatus')}</th>
+                    <th className={styles.th}>{renderSortHeader('Status', 'status')}</th>
+                    <th className={`${styles.th} ${styles.thCenter}`}>{renderSortHeader('Counter', 'phase')}</th>
+                    <th className={styles.th}>{renderSortHeader('Remaining', 'remaining')}</th>
+                    <th className={styles.th} />
                   </tr>
-                ) : customers.length === 0 ? (
-                  <tr className={styles.emptyRow}>
-                    <td colSpan={7}>No customers yet. Add the first one.</td>
+                  <tr className={styles.colFilterRow}>
+                    <th>
+                      <input className={styles.colFilterInput} placeholder="Filter…" value={colFilters.name}
+                        onChange={(e) => setColFilters((f) => ({ ...f, name: e.target.value }))} />
+                    </th>
+                    <th>
+                      <select className={styles.colFilterInput} value={colFilters.building}
+                        onChange={(e) => setColFilters((f) => ({ ...f, building: e.target.value }))}>
+                        <option value="">All</option>
+                        {buildings.map((b) => <option key={b.id} value={b.name}>{b.name}</option>)}
+                      </select>
+                    </th>
+                    <th>
+                      <select className={styles.colFilterInput} value={colFilters.type}
+                        onChange={(e) => setColFilters((f) => ({ ...f, type: e.target.value }))}>
+                        <option value="">All</option>
+                        {types.map((t) => <option key={t.id} value={t.id}>{t.description}</option>)}
+                      </select>
+                    </th>
+                    <th>
+                      <select className={styles.colFilterInput} value={colFilters.paymentStatus}
+                        onChange={(e) => setColFilters((f) => ({ ...f, paymentStatus: e.target.value }))}>
+                        <option value="">All</option>
+                        {statuses.map((s) => <option key={s.id} value={s.id}>{s.Status}</option>)}
+                      </select>
+                    </th>
+                    <th>
+                      <select className={styles.colFilterInput} value={colFilters.status}
+                        onChange={(e) => setColFilters((f) => ({ ...f, status: e.target.value }))}>
+                        <option value="">All</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                      </select>
+                    </th>
+                    <th>
+                      <select className={styles.colFilterInput} value={colFilters.phase}
+                        onChange={(e) => setColFilters((f) => ({ ...f, phase: e.target.value }))}>
+                        <option value="">All</option>
+                        <option value="3">3φ</option>
+                        <option value="1">1φ</option>
+                      </select>
+                    </th>
+                    <th>
+                      <select className={styles.colFilterInput} value={colFilters.balance}
+                        onChange={(e) => setColFilters((f) => ({ ...f, balance: e.target.value }))}>
+                        <option value="">All</option>
+                        <option value="owing">Owing</option>
+                        <option value="paid">Paid up</option>
+                        <option value="nobill">No bill</option>
+                      </select>
+                    </th>
+                    <th>
+                      {(colFilters.name || colFilters.type || colFilters.building || colFilters.paymentStatus || colFilters.status || colFilters.phase || colFilters.balance) && (
+                        <button type="button" className={styles.clearFiltersBtn} onClick={() => setColFilters(EMPTY_CUSTOMER_FILTERS)}>
+                          Clear
+                        </button>
+                      )}
+                    </th>
                   </tr>
-                ) : (
-                  customers.map((c) => {
+                </thead>
+                <tbody>
+                  {filteredSortedCustomers.length === 0 && (
+                    <tr className={styles.emptyRow}><td colSpan={8}>No customers match.</td></tr>
+                  )}
+                  {filteredSortedCustomers.map((c) => {
                     const initials = (c.firstName[0] + c.lastName[0]).toUpperCase();
-                    const fullName = [c.firstName, c.middleName, c.lastName].filter(Boolean).join(' ');
-                    const billStatus = c.consumptionStatus.Status.toLowerCase();
-                    const billStyle =
-                      billStatus === 'paid'
-                        ? { background: 'rgba(52,211,153,0.1)', color: '#34d399', border: '1px solid rgba(52,211,153,0.2)' }
-                        : billStatus === 'overdue'
-                          ? { background: 'rgba(248,113,113,0.1)', color: '#f87171', border: '1px solid rgba(248,113,113,0.2)' }
-                          : { background: 'rgba(251,191,36,0.1)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.2)' };
+                    const billStyle = billStyleFor(c.consumptionStatus.Status);
 
                     return (
                       <tr key={c.id} className={styles.tr}>
                         <td className={styles.td}>
                           <div className={styles.clientNameCell}>
                             <div className={styles.avatar}>{initials}</div>
-                            <Link to={`/customers/${c.id}`} className={styles.clientNameLink}>{fullName}</Link>
+                            <Link to={`/customers/${c.id}`} className={styles.clientNameLink}>{fullName(c)}</Link>
                           </div>
                         </td>
                         <td className={`${styles.td} ${styles.tdGray}`}>
-                          {c.phoneNumber ?? '—'}
+                          {c.buildingFloor ? `${buildingNameOf(c)} · Floor ${c.buildingFloor.floorNumber} ${c.buildingFloor.apartmentSide}` : '—'}
                         </td>
                         <td className={styles.td}>
                           <p className={styles.ampsMain}>{c.consumptionType.Ampere} A{c.consumptionType.ThreePhase ? ' 3φ' : ''}</p>
@@ -774,6 +1033,7 @@ export function GeneratorGroupView() {
                             {c.isCounter ? 'Yes' : 'No'}
                           </span>
                         </td>
+                        <td className={styles.td}>{renderRemaining(c)}</td>
                         <td className={`${styles.td} ${styles.tdCenter}`}>
                           <button className={styles.expandBtn} onClick={() => openEditModal(c)} title="Edit customer">
                             <Pencil size={14} />
@@ -781,7 +1041,166 @@ export function GeneratorGroupView() {
                         </td>
                       </tr>
                     );
-                  })
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : customerView === 'byBuilding' ? (
+          <div className={`${styles.buildingList} ${styles.scrollPane}`}>
+            {customersByBuilding.map((g) => {
+              const key = `building:${g.key}`;
+              const expanded = expandedGroups.has(key);
+              return (
+                <div key={key} className={styles.buildingCard}>
+                  <button className={styles.buildingToggle} onClick={() => toggleGroup(key)}>
+                    <Building2 size={16} color="#a78bfa" />
+                    <span className={styles.buildingName}>{g.label}</span>
+                    <span className={styles.buildingFloorCount}>{g.items.length} customer{g.items.length !== 1 ? 's' : ''}</span>
+                    {renderGroupRemainingBadge(g.totalRemaining)}
+                    {expanded ? <ChevronDown size={16} color="#6b7280" /> : <ChevronRight size={16} color="#6b7280" />}
+                  </button>
+                  {expanded && (
+                    <div className={styles.buildingFloors}>
+                      <table className={styles.floorTable}>
+                        <thead>
+                          <tr><th>Customer</th><th>Floor</th><th>Subscription</th><th>Bill Status</th><th>Remaining</th></tr>
+                        </thead>
+                        <tbody>
+                          {g.items.map((c) => (
+                            <tr key={c.id}>
+                              <td><Link to={`/customers/${c.id}`} className={styles.clientNameLink}>{fullName(c)}</Link></td>
+                              <td>{c.buildingFloor ? `${c.buildingFloor.floorNumber} ${c.buildingFloor.apartmentSide}` : '—'}</td>
+                              <td>{c.consumptionType.description}</td>
+                              <td>
+                                <span className={styles.inlineStatus} style={billStyleFor(c.consumptionStatus.Status)}>
+                                  <span className={styles.inlineDot} />
+                                  {c.consumptionStatus.Status}
+                                </span>
+                              </td>
+                              <td>{renderRemaining(c)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className={`${styles.buildingList} ${styles.scrollPane}`}>
+            {customersByType.map((g) => {
+              const key = `type:${g.key}`;
+              const expanded = expandedGroups.has(key);
+              return (
+                <div key={key} className={styles.buildingCard}>
+                  <button className={styles.buildingToggle} onClick={() => toggleGroup(key)}>
+                    <Zap size={16} color="#facc15" />
+                    <span className={styles.buildingName}>{g.label}</span>
+                    {g.type && (
+                      <span className={styles.buildingFloorCount}>
+                        {g.type.Ampere} A · {g.type.ThreePhase ? '3-Phase' : '1-Phase'} · {g.type.isCounter ? 'Counter' : 'Fixed'}
+                      </span>
+                    )}
+                    <span className={styles.buildingFloorCount}>{g.items.length} customer{g.items.length !== 1 ? 's' : ''}</span>
+                    {renderGroupRemainingBadge(g.totalRemaining)}
+                    {expanded ? <ChevronDown size={16} color="#6b7280" /> : <ChevronRight size={16} color="#6b7280" />}
+                  </button>
+                  {expanded && (
+                    <div className={styles.buildingFloors}>
+                      <table className={styles.floorTable}>
+                        <thead>
+                          <tr><th>Customer</th><th>Building / Floor</th><th>Bill Status</th><th>Remaining</th></tr>
+                        </thead>
+                        <tbody>
+                          {g.items.map((c) => (
+                            <tr key={c.id}>
+                              <td><Link to={`/customers/${c.id}`} className={styles.clientNameLink}>{fullName(c)}</Link></td>
+                              <td>{c.buildingFloor ? `${buildingNameOf(c)} · Floor ${c.buildingFloor.floorNumber} ${c.buildingFloor.apartmentSide}` : '—'}</td>
+                              <td>
+                                <span className={styles.inlineStatus} style={billStyleFor(c.consumptionStatus.Status)}>
+                                  <span className={styles.inlineDot} />
+                                  {c.consumptionStatus.Status}
+                                </span>
+                              </td>
+                              <td>{renderRemaining(c)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Buildings table */}
+        {!buildingsLoading && buildings.length > 0 && (
+          <div className={styles.filterRow}>
+            <div className={styles.searchWrap}>
+              <Search size={15} className={styles.searchIcon} />
+              <input
+                className={styles.searchInput}
+                placeholder="Search building…"
+                value={buildingSearch}
+                onChange={(e) => setBuildingSearch(e.target.value)}
+              />
+            </div>
+            <select
+              className={`${styles.formInput} ${styles.formSelect}`}
+              style={{ maxWidth: 200 }}
+              value={buildingSort}
+              onChange={(e) => setBuildingSort(e.target.value as typeof buildingSort)}
+            >
+              <option value="name-asc">Name A–Z</option>
+              <option value="name-desc">Name Z–A</option>
+              <option value="floors-desc">Most floors</option>
+              <option value="floors-asc">Fewest floors</option>
+            </select>
+          </div>
+        )}
+        <div className={styles.tableCard}>
+          <div className={`${styles.tableScroll} ${styles.scrollPane}`}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th className={styles.th}>Building</th>
+                  <th className={`${styles.th} ${styles.thCenter}`}>Floors / Units</th>
+                </tr>
+              </thead>
+              <tbody>
+                {buildingsLoading ? (
+                  <tr className={styles.emptyRow}>
+                    <td colSpan={2}>Loading buildings…</td>
+                  </tr>
+                ) : buildings.length === 0 ? (
+                  <tr className={styles.emptyRow}>
+                    <td colSpan={2}>No buildings yet. Add the first one.</td>
+                  </tr>
+                ) : filteredBuildings.length === 0 ? (
+                  <tr className={styles.emptyRow}>
+                    <td colSpan={2}>No buildings match.</td>
+                  </tr>
+                ) : (
+                  filteredBuildings.map((b) => (
+                    <tr key={b.id} className={styles.tr}>
+                      <td className={styles.td}>
+                        <div className={styles.clientNameCell}>
+                          <div className={styles.avatar}>
+                            <Building2 size={14} color="#9ca3af" />
+                          </div>
+                          <span className={styles.clientName}>{b.name}</span>
+                        </div>
+                      </td>
+                      <td className={`${styles.td} ${styles.tdCenter} ${styles.tdGray}`}>
+                        {b.floorCount}
+                      </td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>

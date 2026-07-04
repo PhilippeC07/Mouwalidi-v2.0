@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service.js';
-import { CreateMonthlyBillingDto, CustomerTypeSummaryDto, MonthlyCustomerEntryDto, MonthlySummaryDto, RegionSummaryLineDto, UpdateMonthlyConsumptionDto } from './dto/billing.dto.js';
+import { CounterUpdateItemDto, CreateMonthlyBillingDto, CustomerBalanceDto, CustomerTypeSummaryDto, MonthlyCounterEntryDto, MonthlyCustomerEntryDto, MonthlySummaryDto, RegionSummaryLineDto, UpdateMonthlyConsumptionDto } from './dto/billing.dto.js';
 
 @Injectable()
 export class BillingService {
@@ -136,9 +136,12 @@ export class BillingService {
     return c.isCounter ? (c.currentCounter - c.previousCounter) * c.kwhPrice + c.monthlyFee : c.monthlyFee;
   }
 
-  private async fetchMonthConsumptions(month: string) {
+  private async fetchMonthConsumptions(month: string, generatorGroupId?: string) {
     return this.db.monthlyConsumption.findMany({
-      where: { date: this.monthBounds(month) },
+      where: {
+        date: this.monthBounds(month),
+        ...(generatorGroupId ? { customer: { consumptionType: { generatorGroupId } } } : {}),
+      },
       select: {
         id: true,
         previousCounter: true,
@@ -263,6 +266,58 @@ export class BillingService {
       })
       .filter((e) => e.amountPaid > 0)
       .sort((a, b) => b.amountPaid - a.amountPaid);
+  }
+
+  async getMonthlyCustomerBalances(month: string, generatorGroupId: string): Promise<CustomerBalanceDto[]> {
+    const consumptions = await this.fetchMonthConsumptions(month, generatorGroupId);
+    return consumptions.map((c) => {
+      const balance = this.calcBalance({
+        isCounter: c.customer.isCounter,
+        previousCounter: c.previousCounter,
+        currentCounter: c.currentCounter,
+        kwhPrice: c.kwhPrice,
+        monthlyFee: c.monthlyFee,
+      });
+      return {
+        customerId: c.customer.id,
+        consumptionId: c.id,
+        balance,
+        amountPaid: c.amountPaid,
+        remaining: balance - c.amountPaid,
+        closedBalance: c.closedBalance,
+      };
+    });
+  }
+
+  async getMonthlyCounterEntries(month: string, generatorGroupId: string): Promise<MonthlyCounterEntryDto[]> {
+    const consumptions = await this.fetchMonthConsumptions(month, generatorGroupId);
+    return consumptions
+      .filter((c) => c.customer.isCounter)
+      .map((c) => ({
+        consumptionId: c.id,
+        customerId: c.customer.id,
+        customerName: [c.customer.firstName, c.customer.middleName, c.customer.lastName].filter(Boolean).join(' '),
+        groupName: c.customer.consumptionType.generatorGroup?.name ?? '',
+        regionName: c.customer.consumptionType.generatorGroup?.region?.name ?? '',
+        previousCounter: c.previousCounter,
+        currentCounter: c.currentCounter,
+        kwhPrice: c.kwhPrice,
+        closedBalance: c.closedBalance,
+      }))
+      .sort((a, b) => a.customerName.localeCompare(b.customerName));
+  }
+
+  async bulkUpdateCounters(updates: CounterUpdateItemDto[]) {
+    if (updates.length === 0) return { updated: 0 };
+    const results = await this.db.$transaction(
+      updates.map((u) =>
+        this.db.monthlyConsumption.update({
+          where: { id: u.consumptionId },
+          data: { currentCounter: u.currentCounter },
+        }),
+      ),
+    );
+    return { updated: results.length };
   }
 
   async getMonthlyBillings(generatorGroupId: string, isCounter: boolean) {

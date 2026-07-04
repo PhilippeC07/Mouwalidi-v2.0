@@ -68,7 +68,7 @@ export function RegionsProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const response = await axios.get<RegionResponseDto[]>(
-        'http://localhost:3000/api/generator/regions',
+        '/api/generator/regions',
       );
       setData(
         response.data.map((region) => ({

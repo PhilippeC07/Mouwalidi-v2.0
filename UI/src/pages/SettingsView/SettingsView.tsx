@@ -865,6 +865,7 @@ export function SettingsView() {
   const { data: regions, loading, error, refetch: refetchRegions } = useRegions();
   const [collapsedRegions, setCollapsedRegions] = useState<Set<string>>(new Set());
   const [regionKeys, setRegionKeys] = useState<Record<string, number>>({});
+  const [activeTab, setActiveTab] = useState<'infrastructure' | 'billing'>('infrastructure');
 
   function toggleRegion(id: string) {
     setCollapsedRegions((prev) => {
@@ -885,91 +886,109 @@ export function SettingsView() {
         <p className={styles.pageSubtitle}>Configure monthly billing for each generator group</p>
       </div>
 
+      <div className={styles.tabBar}>
+        <button
+          className={`${styles.tabBtn} ${activeTab === 'infrastructure' ? styles.tabBtnActive : ''}`}
+          onClick={() => setActiveTab('infrastructure')}
+        >
+          Infrastructure
+        </button>
+        <button
+          className={`${styles.tabBtn} ${activeTab === 'billing' ? styles.tabBtnActive : ''}`}
+          onClick={() => setActiveTab('billing')}
+        >
+          Monthly Billing
+        </button>
+      </div>
+
       <div className={styles.content}>
-        {/* ── Infrastructure section ── */}
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Infrastructure</h2>
-          <p className={styles.sectionDesc}>
-            Create regions, generator groups, and generators. New groups and generators will appear
-            immediately in billing and the main generator views.
-          </p>
-          <div className={styles.infraGrid}>
-            <AddRegionCard onSuccess={() => void refetchRegions()} />
-            <AddGroupCard regions={regions} onSuccess={() => void refetchRegions()} />
-            <AddGeneratorCard regions={regions} onSuccess={() => void refetchRegions()} />
-          </div>
+        {activeTab === 'infrastructure' && (
+          <section className={styles.section}>
+            <h2 className={styles.sectionTitle}>Infrastructure</h2>
+            <p className={styles.sectionDesc}>
+              Create regions, generator groups, and generators. New groups and generators will appear
+              immediately in billing and the main generator views.
+            </p>
+            <div className={styles.infraGrid}>
+              <AddRegionCard onSuccess={() => void refetchRegions()} />
+              <AddGroupCard regions={regions} onSuccess={() => void refetchRegions()} />
+              <AddGeneratorCard regions={regions} onSuccess={() => void refetchRegions()} />
+            </div>
 
-          <div className={styles.infraGrid} style={{ marginTop: '1.25rem' }}>
-            <ManageRegions onRefetch={() => void refetchRegions()} />
-            <ManageGroups onRefetch={() => void refetchRegions()} />
-            <ManageGenerators onRefetch={() => void refetchRegions()} />
-          </div>
-        </section>
+            <div className={styles.infraGrid} style={{ marginTop: '1.25rem' }}>
+              <ManageRegions onRefetch={() => void refetchRegions()} />
+              <ManageGroups onRefetch={() => void refetchRegions()} />
+              <ManageGenerators onRefetch={() => void refetchRegions()} />
+            </div>
+          </section>
+        )}
 
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Monthly Billing</h2>
-          <p className={styles.sectionDesc}>
-            For each group, set the kWh price for counter customers and the per-amp price for fixed customers.
-            You can also apply a month to all groups in a region at once.
-          </p>
+        {activeTab === 'billing' && (
+          <section className={styles.section}>
+            <h2 className={styles.sectionTitle}>Monthly Billing</h2>
+            <p className={styles.sectionDesc}>
+              For each group, set the kWh price for counter customers and the per-amp price for fixed customers.
+              You can also apply a month to all groups in a region at once.
+            </p>
 
-          {loading && <p className={styles.stateMsg}>Loading regions…</p>}
-          {error && <p className={styles.stateErr}>{error}</p>}
+            {loading && <p className={styles.stateMsg}>Loading regions…</p>}
+            {error && <p className={styles.stateErr}>{error}</p>}
 
-          {!loading && !error && regions.map((region) => {
-            const collapsed = collapsedRegions.has(region.id);
-            const refetchKey = regionKeys[region.id] ?? 0;
-            return (
-              <div key={region.id} className={styles.regionBlock}>
-                <button className={styles.regionHeader} onClick={() => toggleRegion(region.id)}>
-                  <div className={styles.regionHeaderLeft}>
-                    <MapPin size={14} className={styles.regionIcon} />
-                    <span className={styles.regionName}>{region.label}</span>
-                    <span className={styles.regionGroupCount}>
-                      {region.groups.length} group{region.groups.length !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                  {collapsed
-                    ? <ChevronRight size={15} color="#6b7280" />
-                    : <ChevronDown size={15} color="#6b7280" />}
-                </button>
+            {!loading && !error && regions.map((region) => {
+              const collapsed = collapsedRegions.has(region.id);
+              const refetchKey = regionKeys[region.id] ?? 0;
+              return (
+                <div key={region.id} className={styles.regionBlock}>
+                  <button className={styles.regionHeader} onClick={() => toggleRegion(region.id)}>
+                    <div className={styles.regionHeaderLeft}>
+                      <MapPin size={14} className={styles.regionIcon} />
+                      <span className={styles.regionName}>{region.label}</span>
+                      <span className={styles.regionGroupCount}>
+                        {region.groups.length} group{region.groups.length !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    {collapsed
+                      ? <ChevronRight size={15} color="#6b7280" />
+                      : <ChevronDown size={15} color="#6b7280" />}
+                  </button>
 
-                {!collapsed && (
-                  <div className={styles.regionGroups}>
-                    {/* Region-level billing — only shown when 2+ groups */}
-                    {region.groups.length > 1 && (
-                      <div className={styles.regionBillingSection}>
-                        <div className={styles.regionBillingHeader}>
-                          <Layers size={13} className={styles.regionBillingIcon} />
-                          <span className={styles.regionBillingLabel}>Apply to all groups</span>
+                  {!collapsed && (
+                    <div className={styles.regionGroups}>
+                      {/* Region-level billing — only shown when 2+ groups */}
+                      {region.groups.length > 1 && (
+                        <div className={styles.regionBillingSection}>
+                          <div className={styles.regionBillingHeader}>
+                            <Layers size={13} className={styles.regionBillingIcon} />
+                            <span className={styles.regionBillingLabel}>Apply to all groups</span>
+                          </div>
+                          <div className={styles.regionBillingPanels}>
+                            <RegionBillingPanel
+                              region={region}
+                              isCounter={true}
+                              onSuccess={() => bumpRegionKey(region.id)}
+                            />
+                            <RegionBillingPanel
+                              region={region}
+                              isCounter={false}
+                              onSuccess={() => bumpRegionKey(region.id)}
+                            />
+                          </div>
                         </div>
-                        <div className={styles.regionBillingPanels}>
-                          <RegionBillingPanel
-                            region={region}
-                            isCounter={true}
-                            onSuccess={() => bumpRegionKey(region.id)}
-                          />
-                          <RegionBillingPanel
-                            region={region}
-                            isCounter={false}
-                            onSuccess={() => bumpRegionKey(region.id)}
-                          />
-                        </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* Individual group rows */}
-                    {region.groups.length === 0
-                      ? <p className={styles.stateMsg}>No groups in this region.</p>
-                      : region.groups.map((group) => (
-                          <GroupRow key={group.id} group={group} refetchKey={refetchKey} />
-                        ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </section>
+                      {/* Individual group rows */}
+                      {region.groups.length === 0
+                        ? <p className={styles.stateMsg}>No groups in this region.</p>
+                        : region.groups.map((group) => (
+                            <GroupRow key={group.id} group={group} refetchKey={refetchKey} />
+                          ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </section>
+        )}
       </div>
     </div>
   );
