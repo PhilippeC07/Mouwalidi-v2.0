@@ -96,6 +96,38 @@ export class RegionResponseDto {
   generatorGroups!: GeneratorGroupSummaryDto[];
 }
 
+export class GroupOverviewDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  name!: string;
+
+  @ApiProperty()
+  region!: string;
+
+  @ApiProperty()
+  generatorCount!: number;
+
+  @ApiProperty()
+  totalKva!: number;
+
+  @ApiProperty()
+  totalClients!: number;
+
+  @ApiProperty()
+  totalLoad!: number;
+
+  @ApiProperty()
+  totalRevenue!: number;
+
+  @ApiProperty()
+  overdueCount!: number;
+
+  @ApiProperty()
+  unpaidCount!: number;
+}
+
 export class GeneratorsResponseDto {
   @ApiProperty()
   id!: string;

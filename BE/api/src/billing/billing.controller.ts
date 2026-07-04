@@ -1,12 +1,31 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBody, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { BillingService } from './billing.service.js';
-import { CreateMonthlyBillingDto, UpdateMonthlyConsumptionDto } from './dto/billing.dto.js';
+import { CreateMonthlyBillingDto, MonthlyCustomerEntryDto, MonthlySummaryDto, UpdateMonthlyConsumptionDto } from './dto/billing.dto.js';
 
 @ApiTags('Billing')
 @Controller('billing')
 export class BillingController {
   constructor(private readonly billingService: BillingService) {}
+
+  /* ── Accounting ── */
+  @Get('accounting/summary')
+  @ApiQuery({ name: 'month', required: true, description: 'YYYY-MM' })
+  getMonthlySummary(@Query('month') month: string): Promise<MonthlySummaryDto> {
+    return this.billingService.getMonthlySummary(month);
+  }
+
+  @Get('accounting/receivables')
+  @ApiQuery({ name: 'month', required: true })
+  getMonthlyReceivables(@Query('month') month: string): Promise<MonthlyCustomerEntryDto[]> {
+    return this.billingService.getMonthlyReceivables(month);
+  }
+
+  @Get('accounting/payments')
+  @ApiQuery({ name: 'month', required: true })
+  getMonthlyPayments(@Query('month') month: string): Promise<MonthlyCustomerEntryDto[]> {
+    return this.billingService.getMonthlyPayments(month);
+  }
 
   @Post('monthly')
   @ApiBody({ type: CreateMonthlyBillingDto })

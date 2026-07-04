@@ -1,26 +1,86 @@
-/* ── CSS custom properties (design tokens) ── */
+/* ── Design tokens ── */
+
+/* Dark (default — slightly lighter than pure black, but still clearly dark) */
 :root {
+  /* Backgrounds */
+  --bg-0: #0a1220;    /* deepest: cards, sidebar, header, modals */
+  --bg-1: #111c2e;    /* page background */
+  --bg-2: #162338;    /* nested sections within page */
+  --bg-3: #1b2a3b;    /* surface / border */
+  --bg-4: #253849;    /* hover state / higher surface */
+
+  /* Text */
+  --tx-0: #eef4fd;    /* primary text */
+  --tx-1: #ccdbe9;    /* secondary text */
+  --tx-2: #a8bdce;    /* body text */
+  --tx-3: #7990a2;    /* muted */
+  --tx-4: #4e6373;    /* faint */
+  --tx-5: #334857;    /* very faint */
+
+  /* Structure */
+  --br: #1b2a3b;
+  --scrollbar: #253849;
+  --overlay: rgba(0, 0, 0, 0.65);
+
+  /* Special composed surfaces */
+  --billing-hdr: #0d1630;   /* billing section header: dark indigo tint */
+
+  /* Accent (yellow/gold) */
+  --accent: #facc15;
+  --accent-bg:  rgba(250, 204, 21, 0.10);
+  --accent-bg2: rgba(250, 204, 21, 0.15);
+  --accent-bg3: rgba(250, 204, 21, 0.20);
+
+  /* Legacy tokens for any component that uses var() directly */
   --font-size: 16px;
-  --background: #111827;
-  --foreground: #ffffff;
-  --card: #030712;
-  --card-foreground: #ffffff;
-  --popover: #030712;
-  --popover-foreground: #ffffff;
-  --primary: #facc15;
-  --primary-foreground: #030712;
-  --secondary: #1f2937;
-  --secondary-foreground: #ffffff;
-  --muted: #1f2937;
-  --muted-foreground: #9ca3af;
-  --accent: #1f2937;
-  --accent-foreground: #ffffff;
+  --background: var(--bg-1);
+  --foreground: var(--tx-0);
+  --card: var(--bg-0);
+  --card-foreground: var(--tx-0);
+  --popover: var(--bg-0);
+  --popover-foreground: var(--tx-0);
+  --primary: var(--accent);
+  --primary-foreground: var(--bg-0);
+  --secondary: var(--bg-3);
+  --secondary-foreground: var(--tx-0);
+  --muted: var(--bg-3);
+  --muted-foreground: var(--tx-3);
+  --accent-color: var(--bg-3);
+  --accent-foreground: var(--tx-0);
   --destructive: #f87171;
-  --destructive-foreground: #ffffff;
-  --border: #1f2937;
-  --input: #1f2937;
-  --ring: #facc15;
+  --destructive-foreground: var(--tx-0);
+  --border: var(--br);
+  --input: var(--bg-3);
+  --ring: var(--accent);
   --radius: 0.625rem;
+}
+
+/* Light theme overrides */
+[data-theme="light"] {
+  /* Slightly tinted off-whites — no pure #fff */
+  --bg-0: #f2f6fb;    /* card / sidebar surface */
+  --bg-1: #e6edf6;    /* page background */
+  --bg-2: #d9e3ef;    /* nested sections */
+  --bg-3: #c6d3e2;    /* border / surface */
+  --bg-4: #adbdce;    /* hover / higher surface */
+
+  --tx-0: #0b1826;
+  --tx-1: #192c3e;
+  --tx-2: #2f4052;
+  --tx-3: #4e6070;
+  --tx-4: #6e8090;
+  --tx-5: #94a4b4;
+
+  --br: #c6d3e2;
+  --scrollbar: #adbdce;
+  --overlay: rgba(0, 0, 0, 0.35);
+
+  --billing-hdr: #dddaff;   /* billing section header: light indigo tint */
+
+  --accent: #a05c00;
+  --accent-bg:  rgba(160, 92, 0, 0.09);
+  --accent-bg2: rgba(160, 92, 0, 0.13);
+  --accent-bg3: rgba(160, 92, 0, 0.19);
 }
 
 /* ── Base resets ── */
@@ -30,7 +90,7 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  border: 0 solid var(--border);
+  border: 0 solid var(--br);
 }
 
 html {
@@ -39,8 +99,8 @@ html {
 }
 
 body {
-  background-color: var(--background);
-  color: var(--foreground);
+  background-color: var(--bg-1);
+  color: var(--tx-0);
   font-family:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
     Cantarell, 'Helvetica Neue', sans-serif;
@@ -50,60 +110,21 @@ body {
 }
 
 /* ── Default typography ── */
-h1 {
-  font-size: 1.5rem;
-  font-weight: 500;
-  line-height: 1.5;
-}
+h1 { font-size: 1.5rem;   font-weight: 500; line-height: 1.5; }
+h2 { font-size: 1.25rem;  font-weight: 500; line-height: 1.5; }
+h3 { font-size: 1.125rem; font-weight: 500; line-height: 1.5; }
+h4 { font-size: 1rem;     font-weight: 500; line-height: 1.5; }
 
-h2 {
-  font-size: 1.25rem;
-  font-weight: 500;
-  line-height: 1.5;
-}
+label  { font-size: 1rem; font-weight: 500; line-height: 1.5; }
+button { font-size: 1rem; font-weight: 500; line-height: 1.5; cursor: pointer; }
 
-h3 {
-  font-size: 1.125rem;
-  font-weight: 500;
-  line-height: 1.5;
-}
-
-h4 {
-  font-size: 1rem;
-  font-weight: 500;
-  line-height: 1.5;
-}
-
-label {
-  font-size: 1rem;
-  font-weight: 500;
-  line-height: 1.5;
-}
-
-button {
-  font-size: 1rem;
-  font-weight: 500;
-  line-height: 1.5;
-  cursor: pointer;
-}
-
-input,
-textarea,
-select {
+input, textarea, select {
   font-size: 1rem;
   font-weight: 400;
   line-height: 1.5;
   font-family: inherit;
 }
 
-img,
-svg,
-video {
-  display: block;
-  max-width: 100%;
-}
+img, svg, video { display: block; max-width: 100%; }
 
-a {
-  color: inherit;
-  text-decoration: none;
-}
+a { color: inherit; text-decoration: none; }

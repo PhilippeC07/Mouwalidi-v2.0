@@ -9,6 +9,7 @@ import { updateMonthlyConsumption, type UpdateMonthlyConsumptionPayload } from '
 import styles from './CustomerDetailView.module.css';
 
 interface RowState {
+  previousCounter: string;
   currentCounter: string;
   monthlyFee: string;
   amountPaid: string;
@@ -82,6 +83,20 @@ export function CustomerDetailView() {
   const initials = (customer.firstName[0] + customer.lastName[0]).toUpperCase();
   const isCounter = customer.consumptionType.isCounter;
   const payStatus = customer.consumptionStatus.Status.toLowerCase();
+
+  function checkAutoClose(id: string, saved: UpdateMonthlyConsumptionPayload, row: RowState, m: MonthlyConsumptionRecord) {
+    if (row.closedBalance) return;
+    const prev = saved.previousCounter ?? parseNum(row.previousCounter, m.previousCounter);
+    const curr = saved.currentCounter  ?? parseNum(row.currentCounter,  m.currentCounter);
+    const fee  = saved.monthlyFee      ?? parseNum(row.monthlyFee,      m.monthlyFee);
+    const paid = saved.amountPaid      ?? parseNum(row.amountPaid,      m.amountPaid);
+    const balance   = isCounter ? (curr - prev) * m.kwhPrice + fee : fee;
+    const remaining = balance - paid;
+    if (remaining <= 0.001) {
+      patchRow(id, { closedBalance: true });
+      void save(id, { closedBalance: true });
+    }
+  }
 
   return (
     <div className={styles.page}>
@@ -176,6 +191,43 @@ export function CustomerDetailView() {
           {saveError && <span className={styles.saveErrorInline}>{saveError}</span>}
         </div>
 
+        {customer.monthlyConsumptions.length > 0 && (() => {
+          let totalBilled = 0;
+          let totalPaid = 0;
+          let totalOutstanding = 0;
+          for (const m of customer.monthlyConsumptions) {
+            const row = rows[m.id] ?? rowFromRecord(m);
+            const prevCounter = parseNum(row.previousCounter, m.previousCounter);
+            const currCounter = parseNum(row.currentCounter, m.currentCounter);
+            const fee = parseNum(row.monthlyFee, m.monthlyFee);
+            const paid = parseNum(row.amountPaid, m.amountPaid);
+            const balance = isCounter ? (currCounter - prevCounter) * m.kwhPrice + fee : fee;
+            const remaining = balance - paid;
+            totalBilled += balance;
+            totalPaid += paid;
+            if (!row.closedBalance) totalOutstanding += remaining;
+          }
+          const hasDue = totalOutstanding > 0.001;
+          return (
+            <div className={styles.summaryStrip}>
+              <div className={styles.summaryCard}>
+                <p className={styles.summaryLabel}>Total Billed</p>
+                <p className={styles.summaryValue}>${totalBilled.toFixed(2)}</p>
+              </div>
+              <div className={styles.summaryCard}>
+                <p className={styles.summaryLabel}>Total Paid</p>
+                <p className={`${styles.summaryValue} ${styles.summaryPaid}`}>${totalPaid.toFixed(2)}</p>
+              </div>
+              <div className={`${styles.summaryCard} ${hasDue ? styles.summaryCardDue : styles.summaryCardClear}`}>
+                <p className={styles.summaryLabel}>Outstanding</p>
+                <p className={`${styles.summaryValue} ${hasDue ? styles.summaryDue : styles.summaryClear}`}>
+                  ${totalOutstanding.toFixed(2)}
+                </p>
+              </div>
+            </div>
+          );
+        })()}
+
         {customer.monthlyConsumptions.length === 0 ? (
           <p className={styles.empty}>No billing records yet for this customer.</p>
         ) : (
@@ -201,10 +253,11 @@ export function CustomerDetailView() {
                 {customer.monthlyConsumptions.map((m) => {
                   const row = rows[m.id] ?? rowFromRecord(m);
 
-                  const currCounter = parseNum(row.currentCounter, m.currentCounter);
-                  const fee         = parseNum(row.monthlyFee,     m.monthlyFee);
-                  const paid        = parseNum(row.amountPaid,      m.amountPaid);
-                  const usage       = currCounter - m.previousCounter;
+                  const prevCounter = parseNum(row.previousCounter, m.previousCounter);
+                  const currCounter = parseNum(row.currentCounter,  m.currentCounter);
+                  const fee         = parseNum(row.monthlyFee,      m.monthlyFee);
+                  const paid        = parseNum(row.amountPaid,       m.amountPaid);
+                  const usage       = currCounter - prevCounter;
                   const balance     = isCounter ? usage * m.kwhPrice + fee : fee;
                   const remaining   = balance - paid;
 
@@ -217,7 +270,18 @@ export function CustomerDetailView() {
                       <td className={styles.monthCell}>{formatMonth(m.date)}</td>
 
                       {isCounter && (
-                        <td className={styles.numCell}>{m.previousCounter}</td>
+                        <td className={styles.numCell}>
+                          <input
+                            className={styles.cellInput}
+                            type="number"
+                            value={row.previousCounter}
+                            onChange={e => patchRow(m.id, { previousCounter: e.target.value })}
+                            onBlur={e => {
+                              const p = { previousCounter: Number(e.target.value) || 0 };
+                              void save(m.id, p); checkAutoClose(m.id, p, row, m);
+                            }}
+                          />
+                        </td>
                       )}
 
                       {isCounter && (
@@ -227,7 +291,10 @@ export function CustomerDetailView() {
                             type="number"
                             value={row.currentCounter}
                             onChange={e => patchRow(m.id, { currentCounter: e.target.value })}
-                            onBlur={e => save(m.id, { currentCounter: Number(e.target.value) || 0 })}
+                            onBlur={e => {
+                              const p = { currentCounter: Number(e.target.value) || 0 };
+                              void save(m.id, p); checkAutoClose(m.id, p, row, m);
+                            }}
                           />
                         </td>
                       )}
@@ -250,7 +317,10 @@ export function CustomerDetailView() {
                           type="number"
                           value={row.monthlyFee}
                           onChange={e => patchRow(m.id, { monthlyFee: e.target.value })}
-                          onBlur={e => save(m.id, { monthlyFee: Number(e.target.value) || 0 })}
+                          onBlur={e => {
+                            const p = { monthlyFee: Number(e.target.value) || 0 };
+                            void save(m.id, p); checkAutoClose(m.id, p, row, m);
+                          }}
                         />
                       </td>
 
@@ -264,12 +334,19 @@ export function CustomerDetailView() {
                           type="number"
                           value={row.amountPaid}
                           onChange={e => patchRow(m.id, { amountPaid: e.target.value })}
-                          onBlur={e => save(m.id, { amountPaid: Number(e.target.value) || 0 })}
+                          onBlur={e => {
+                            const p = { amountPaid: Number(e.target.value) || 0 };
+                            void save(m.id, p); checkAutoClose(m.id, p, row, m);
+                          }}
                         />
                       </td>
 
                       <td className={styles.numCell}>
-                        <span className={remaining > 0.001 ? styles.remainingDue : styles.remainingClear}>
+                        <span className={
+                          remaining > 0.001
+                            ? row.closedBalance ? styles.remainingClosed : styles.remainingDue
+                            : styles.remainingClear
+                        }>
                           ${Math.max(0, remaining).toFixed(2)}
                         </span>
                       </td>
@@ -334,6 +411,7 @@ export function CustomerDetailView() {
 
 function rowFromRecord(m: MonthlyConsumptionRecord): RowState {
   return {
+    previousCounter: String(m.previousCounter),
     currentCounter: String(m.currentCounter),
     monthlyFee: String(m.monthlyFee),
     amountPaid: String(m.amountPaid),

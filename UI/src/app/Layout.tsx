@@ -3,12 +3,14 @@ import { Outlet } from 'react-router-dom';
 import { Menu } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { RegionsProvider } from '../context/RegionsContext';
+import { ThemeProvider } from '../context/ThemeContext';
 import styles from './app.module.scss';
 
 export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
+    <ThemeProvider>
     <RegionsProvider>
     <div className={styles.root}>
       {sidebarOpen && (
@@ -38,5 +40,6 @@ export function Layout() {
       </div>
     </div>
     </RegionsProvider>
+    </ThemeProvider>
   );
 }

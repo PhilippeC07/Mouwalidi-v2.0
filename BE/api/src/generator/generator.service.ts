@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service.js';
-import { GeneratorsResponseDto, RegionResponseDto } from './dto/region.dto.js';
+import { GeneratorsResponseDto, GroupOverviewDto, RegionResponseDto } from './dto/region.dto.js';
 import { mapGeneratorsToDto } from './helpers/mappers.js';
 
 @Injectable()
@@ -139,6 +139,56 @@ export class GeneratorService {
     });
   }
 
+  async getGroupSummaries(): Promise<GroupOverviewDto[]> {
+    const groups = await this.db.generatorGroup.findMany({
+      select: {
+        id: true,
+        name: true,
+        region: { select: { name: true } },
+        generators: { select: { kvaCapacity: true } },
+        consumptionTypes: {
+          select: {
+            Ampere: true,
+            customers: {
+              select: {
+                consumptionStatus: { select: { Status: true } },
+                monthlyConsumptions: {
+                  select: { amountPaid: true, monthlyFee: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return groups.map((g) => {
+      const customers = g.consumptionTypes.flatMap((ct) =>
+        ct.customers.map((c) => ({
+          status: c.consumptionStatus.Status,
+          ampere: ct.Ampere,
+          monthlyConsumptions: c.monthlyConsumptions,
+        })),
+      );
+
+      return {
+        id: g.id,
+        name: g.name,
+        region: g.region.name,
+        generatorCount: g.generators.length,
+        totalKva: g.generators.reduce((s, gen) => s + gen.kvaCapacity, 0),
+        totalClients: customers.length,
+        totalLoad: customers.reduce((s, c) => s + c.ampere, 0),
+        totalRevenue: customers.reduce(
+          (s, c) => s + c.monthlyConsumptions.reduce((ms, mc) => ms + mc.amountPaid, 0),
+          0,
+        ),
+        overdueCount: customers.filter((c) => c.status.toLowerCase() === 'overdue').length,
+        unpaidCount: customers.filter((c) => c.status.toLowerCase() === 'unpaid').length,
+      };
+    });
+  }
+
   async getGenerators(): Promise<GeneratorsResponseDto[]> {
     const result = await this.db.generator.findMany({
       select: {
@@ -156,6 +206,9 @@ export class GeneratorService {
                 customers: {
                   select: {
                     consumptionStatus: { select: { Status: true } },
+                    monthlyConsumptions: {
+                      select: { amountPaid: true, monthlyFee: true },
+                    },
                   },
                 },
               },

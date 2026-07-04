@@ -9,8 +9,13 @@ import {
   MapPin,
   ChevronDown,
   FolderTree,
+  CreditCard,
+  BookOpen,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { useRegions } from '../hooks/useGetRegions';
+import { useTheme } from '../context/ThemeContext';
 import styles from './Sidebar.module.css';
 
 interface SidebarProps {
@@ -19,6 +24,7 @@ interface SidebarProps {
 
 export function Sidebar({ onCloseSidebar }: SidebarProps) {
   const { data: regions, loading, error } = useRegions();
+  const { theme, toggle } = useTheme();
 
   const [collapsedRegions, setCollapsedRegions] = useState<Set<string>>(
     new Set(),
@@ -223,6 +229,38 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
               );
             })}
         </div>
+
+        {/* ── Accounting ── */}
+        <div className={styles.accountingSection}>
+          <p className={styles.sectionLabel} style={{ marginTop: 12 }}>Accounting</p>
+
+          <NavLink
+            to="/accounting/summary"
+            className={({ isActive }) => `${styles.navBtn} ${isActive ? styles.navBtnActive : ''}`}
+            onClick={handleNavigate}
+          >
+            <BarChart3 size={15} />
+            <span>Summary</span>
+          </NavLink>
+
+          <NavLink
+            to="/accounting/receivables"
+            className={({ isActive }) => `${styles.navBtn} ${isActive ? styles.navBtnActive : ''}`}
+            onClick={handleNavigate}
+          >
+            <BookOpen size={15} />
+            <span>Receivables</span>
+          </NavLink>
+
+          <NavLink
+            to="/accounting/payments"
+            className={({ isActive }) => `${styles.navBtn} ${isActive ? styles.navBtnActive : ''}`}
+            onClick={handleNavigate}
+          >
+            <CreditCard size={15} />
+            <span>Payments</span>
+          </NavLink>
+        </div>
       </nav>
 
       <div className={styles.bottom}>
@@ -237,10 +275,10 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
           <span>Settings</span>
         </NavLink>
 
-        <div className={styles.periodCard}>
-          <p className={styles.periodLabel}>Billing Period</p>
-          <p className={styles.periodValue}>March 2026</p>
-        </div>
+        <button className={styles.themeToggle} onClick={toggle} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
+          {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+          <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+        </button>
       </div>
     </div>
   );

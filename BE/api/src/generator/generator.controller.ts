@@ -5,6 +5,7 @@ import {
   CreateGeneratorGroupDto,
   CreateRegionDto,
   GeneratorsResponseDto,
+  GroupOverviewDto,
   RegionResponseDto,
   UpdateGeneratorDto,
   UpdateGeneratorGroupDto,
@@ -41,6 +42,11 @@ export class GeneratorController {
   }
 
   /* ── Generator Groups ── */
+  @Get('group-summaries')
+  getGroupSummaries(): Promise<GroupOverviewDto[]> {
+    return this.generatorService.getGroupSummaries();
+  }
+
   @Post('group')
   @ApiBody({ type: CreateGeneratorGroupDto })
   createGeneratorGroup(@Body() body: CreateGeneratorGroupDto) {

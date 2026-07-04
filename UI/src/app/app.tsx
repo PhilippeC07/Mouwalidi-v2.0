@@ -6,6 +6,9 @@ import { GeneratorGroupView } from '../pages/GeneratorGroupView/GeneratorGroupVi
 import { GroupManagementView } from '../pages/GroupManagementView/GroupManagementView.tsx';
 import { SettingsView } from '../pages/SettingsView/SettingsView.tsx';
 import { CustomerDetailView } from '../pages/CustomerDetailView/CustomerDetailView.tsx';
+import { AccountingSummary } from '../pages/AccountingView/AccountingSummary.tsx';
+import { AccountingReceivables } from '../pages/AccountingView/AccountingReceivables.tsx';
+import { AccountingPayments } from '../pages/AccountingView/AccountingPayments.tsx';
 
 export default function App() {
   return (
@@ -18,6 +21,9 @@ export default function App() {
           <Route path="generator-groups/:groupId/manage" element={<GroupManagementView />} />
           <Route path="settings" element={<SettingsView />} />
           <Route path="customers/:customerId" element={<CustomerDetailView />} />
+          <Route path="accounting/summary" element={<AccountingSummary />} />
+          <Route path="accounting/receivables" element={<AccountingReceivables />} />
+          <Route path="accounting/payments" element={<AccountingPayments />} />
         </Route>
       </Routes>
     </BrowserRouter>

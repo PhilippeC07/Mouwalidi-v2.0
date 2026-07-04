@@ -1,0 +1,227 @@
+.page {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--bg-1);
+  display: flex;
+  flex-direction: column;
+}
+
+.page::-webkit-scrollbar { width: 6px; }
+.page::-webkit-scrollbar-track { background: transparent; }
+.page::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 3px; }
+
+/* ── Header ── */
+.header {
+  background: var(--bg-0);
+  border-bottom: 1px solid var(--br);
+  padding: 20px 24px;
+  flex-shrink: 0;
+}
+
+.pageTitle { color: var(--tx-0); font-size: 1.2rem; font-weight: 700; margin: 0 0 2px; }
+.pageSub   { color: var(--tx-4); font-size: 0.82rem; margin: 0; }
+
+/* ── Month picker (in header) ── */
+.headerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.monthPicker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-2);
+  border: 1px solid var(--br);
+  border-radius: 8px;
+  padding: 4px 6px;
+}
+
+.monthPickerBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--tx-3);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.monthPickerBtn:hover { background: var(--bg-3); color: var(--tx-1); }
+
+.monthPickerLabel {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--tx-1);
+  min-width: 110px;
+  text-align: center;
+  user-select: none;
+}
+
+/* ── KPI strip ── */
+.kpiStrip {
+  display: flex;
+  gap: 1px;
+  background: var(--br);
+  border-bottom: 1px solid var(--br);
+  flex-shrink: 0;
+}
+
+.kpiCard {
+  flex: 1;
+  padding: 16px 20px;
+  background: var(--bg-0);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.kpiLabel {
+  color: var(--tx-4);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0;
+}
+
+.kpiValue {
+  font-size: 1.3rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+  color: var(--tx-1);
+}
+
+.kpiGreen  { color: #34d399; }
+.kpiRed    { color: #f87171; }
+.kpiBlue   { color: #60a5fa; }
+.kpiYellow { color: #fbbf24; }
+
+/* ── Content area ── */
+.content {
+  flex: 1;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow-y: auto;
+}
+
+/* ── Table card ── */
+.tableCard {
+  background: var(--bg-0);
+  border: 1px solid var(--br);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.tableCardHeader {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--br);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tableCardTitle { color: var(--tx-1); font-size: 0.875rem; font-weight: 600; margin: 0; }
+
+.tableCount {
+  background: var(--bg-3);
+  color: var(--tx-4);
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-left: auto;
+}
+
+.tableScroll { overflow-x: auto; }
+
+.table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+
+.table th {
+  text-align: left;
+  padding: 10px 14px;
+  background: var(--bg-2);
+  color: var(--tx-4);
+  font-weight: 500;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.table th.right { text-align: right; }
+
+.table td {
+  padding: 10px 14px;
+  border-top: 1px solid var(--br);
+  color: var(--tx-2);
+  white-space: nowrap;
+}
+
+.table td.right { text-align: right; font-variant-numeric: tabular-nums; }
+
+.table tbody tr:hover td { background: var(--bg-2); }
+
+/* ── Cell colours ── */
+.green  { color: #34d399 !important; font-weight: 600; }
+.red    { color: #f87171 !important; font-weight: 600; }
+.yellow { color: #fbbf24 !important; font-weight: 600; }
+.muted  { color: var(--tx-4) !important; }
+.right  { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ── Customer link ── */
+.customerLink { color: #93c5fd; text-decoration: none; font-weight: 500; }
+.customerLink:hover { color: #60a5fa; text-decoration: underline; }
+
+/* ── Rate bar ── */
+.rateWrap { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+
+.rateBar {
+  width: 60px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--bg-3);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.rateFill { height: 100%; border-radius: 999px; background: #34d399; transition: width 0.3s; }
+
+.rateText { font-size: 0.78rem; font-variant-numeric: tabular-nums; min-width: 42px; text-align: right; }
+
+/* ── Segmented toggle ── */
+.segmentedControl {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-3);
+  border-radius: 6px;
+  padding: 2px;
+  margin-left: auto;
+}
+
+.segmentBtn {
+  padding: 4px 12px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--tx-4);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
+}
+
+.segmentBtn:hover { color: var(--tx-1); }
+.segmentBtnActive { background: var(--bg-0); color: var(--tx-0); }
+
+/* ── Empty / state ── */
+.stateMsg { color: var(--tx-4); font-size: 0.875rem; text-align: center; padding: 40px 0; margin: 0; }
+.stateErr { color: #f87171; font-size: 0.875rem; padding: 24px; margin: 0; }

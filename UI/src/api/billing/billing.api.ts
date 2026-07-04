@@ -38,6 +38,7 @@ export const getMonthlyBillings = async (
 };
 
 export interface UpdateMonthlyConsumptionPayload {
+  previousCounter?: number;
   currentCounter?: number;
   monthlyFee?: number;
   amountPaid?: number;
@@ -45,6 +46,75 @@ export interface UpdateMonthlyConsumptionPayload {
   isCut?: boolean;
   closedBalance?: boolean;
 }
+
+/* ── Accounting ── */
+export interface GroupSummaryLine {
+  groupId: string;
+  groupName: string;
+  regionName: string;
+  totalBilled: number;
+  totalPaid: number;
+  outstanding: number;
+  customerCount: number;
+  collectionRate: number;
+}
+
+export interface CustomerTypeSummary {
+  customerCount: number;
+  totalBilled: number;
+  totalPaid: number;
+  outstanding: number;
+}
+
+export interface RegionSummaryLine {
+  regionId: string;
+  regionName: string;
+  totalBilled: number;
+  totalPaid: number;
+  outstanding: number;
+  customerCount: number;
+  collectionRate: number;
+}
+
+export interface MonthlySummary {
+  month: string;
+  totalBilled: number;
+  totalPaid: number;
+  outstanding: number;
+  collectionRate: number;
+  counter: CustomerTypeSummary;
+  fixed: CustomerTypeSummary;
+  byGroup: GroupSummaryLine[];
+  byRegion: RegionSummaryLine[];
+}
+
+export interface MonthlyCustomerEntry {
+  consumptionId: string;
+  customerId: string;
+  customerName: string;
+  groupName: string;
+  regionName: string;
+  balance: number;
+  amountPaid: number;
+  remaining: number;
+  status: string;
+  closedBalance: boolean;
+}
+
+export const getMonthlySummary = async (month: string): Promise<MonthlySummary> => {
+  const { data } = await api.get<MonthlySummary>('/billing/accounting/summary', { params: { month } });
+  return data;
+};
+
+export const getMonthlyReceivables = async (month: string): Promise<MonthlyCustomerEntry[]> => {
+  const { data } = await api.get<MonthlyCustomerEntry[]>('/billing/accounting/receivables', { params: { month } });
+  return data;
+};
+
+export const getMonthlyPayments = async (month: string): Promise<MonthlyCustomerEntry[]> => {
+  const { data } = await api.get<MonthlyCustomerEntry[]>('/billing/accounting/payments', { params: { month } });
+  return data;
+};
 
 export const updateMonthlyConsumption = async (
   id: string,

@@ -20,6 +20,24 @@ export const getGenerators = async (): Promise<GeneratorDto[]> => {
   return data;
 };
 
+export interface GroupOverviewDto {
+  id: string;
+  name: string;
+  region: string;
+  generatorCount: number;
+  totalKva: number;
+  totalClients: number;
+  totalLoad: number;
+  totalRevenue: number;
+  overdueCount: number;
+  unpaidCount: number;
+}
+
+export const getGroupSummaries = async (): Promise<GroupOverviewDto[]> => {
+  const { data } = await api.get<GroupOverviewDto[]>('/generator/group-summaries');
+  return data;
+};
+
 export const updateRegion = async (id: string, name: string): Promise<void> => {
   await api.put(`/generator/region/${id}`, { name });
 };
