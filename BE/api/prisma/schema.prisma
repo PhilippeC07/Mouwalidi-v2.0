@@ -102,7 +102,9 @@ model MonthlyConsumption {
   previousCounter     Int
   currentCounter      Int
   monthlyFee          Float ///////
+  balanceOverride     Float?
   amountPaid          Float
+  paidDate            DateTime?
   kwhPrice            Float
   note                String?
   isCut               Boolean
@@ -133,6 +135,7 @@ model ConsumptionType {
   Ampere                    Int
   isCounter                 Boolean
   ThreePhase                Boolean
+  monthlyFee                Float                     @default(0)
   generatorGroupId          String                    @db.Uuid
   generatorGroup            GeneratorGroup            @relation(fields: [generatorGroupId], references: [id])
   consumptionPriceHistories ConsumptionPriceHistory[]

@@ -1,4 +1,5 @@
 import { api } from '../axios';
+import type { MonthlyConsumptionRecord } from '../customer/customer.api';
 
 export interface CreateMonthlyBillingPayload {
   generatorGroupId: string;
@@ -37,11 +38,37 @@ export const getMonthlyBillings = async (
   return data;
 };
 
+export const createSingleBilling = async (
+  customerId: string,
+  month: string,
+  price?: number,
+): Promise<MonthlyConsumptionRecord> => {
+  const { data } = await api.post<MonthlyConsumptionRecord>(`/billing/customer/${customerId}/monthly`, { month, price });
+  return data;
+};
+
+export interface CustomerMonthlyRate {
+  exists: boolean;
+  price: number | null;
+}
+
+export const getCustomerMonthlyRate = async (
+  customerId: string,
+  month: string,
+): Promise<CustomerMonthlyRate> => {
+  const { data } = await api.get<CustomerMonthlyRate>(`/billing/customer/${customerId}/monthly-rate`, {
+    params: { month },
+  });
+  return data;
+};
+
 export interface UpdateMonthlyConsumptionPayload {
   previousCounter?: number;
   currentCounter?: number;
   monthlyFee?: number;
+  balanceOverride?: number | null;
   amountPaid?: number;
+  paidDate?: string;
   consumptionStatusId?: string;
   isCut?: boolean;
   closedBalance?: boolean;
@@ -99,6 +126,7 @@ export interface MonthlyCustomerEntry {
   remaining: number;
   status: string;
   closedBalance: boolean;
+  paidDate: string | null;
 }
 
 export const getMonthlySummary = async (month: string): Promise<MonthlySummary> => {
@@ -171,5 +199,28 @@ export const getMonthlyCustomerBalances = async (
   const { data } = await api.get<CustomerBalance[]>('/billing/monthly/balances', {
     params: { generatorGroupId, month },
   });
+  return data;
+};
+
+export interface ReceiptData {
+  consumptionId: string;
+  customerId: string;
+  customerName: string;
+  buildingName: string | null;
+  date: string;
+  isCounter: boolean;
+  ampere: number;
+  threePhase: boolean;
+  monthlyFee: number;
+  previousCounter: number;
+  currentCounter: number;
+  kwhPrice: number;
+  amountPaid: number;
+  balance: number;
+  remaining: number;
+}
+
+export const getReceipts = async (customerIds: string[], months: string[]): Promise<ReceiptData[]> => {
+  const { data } = await api.post<ReceiptData[]>('/billing/receipts', { customerIds, months });
   return data;
 };

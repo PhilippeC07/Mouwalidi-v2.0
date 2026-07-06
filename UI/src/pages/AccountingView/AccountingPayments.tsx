@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { getMonthlyPayments, type MonthlyCustomerEntry } from '../../api/billing/billing.api';
+import { formatMoney } from '../../utils/format';
+import { usePersistentState } from '../../hooks/usePersistentState';
 import styles from './AccountingView.module.css';
 
 function fmtMonth(m: string) {
@@ -13,6 +15,11 @@ function shiftMonth(m: string, delta: number) {
   return new Date(Date.UTC(y, mo - 1 + delta, 1)).toISOString().slice(0, 7);
 }
 
+function fmtDate(iso: string | null) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 export function AccountingPayments() {
   const [searchParams, setSearchParams] = useSearchParams();
   const month = searchParams.get('month') ?? new Date().toISOString().slice(0, 7);
@@ -22,6 +29,7 @@ export function AccountingPayments() {
   const [data, setData] = useState<MonthlyCustomerEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dateSort, setDateSort] = usePersistentState<'asc' | 'desc' | null>('accountingPayments.dateSort', 'asc');
 
   useEffect(() => {
     setLoading(true); setError(null);
@@ -32,6 +40,21 @@ export function AccountingPayments() {
   }, [month]);
 
   const totalCollected = data.reduce((s, e) => s + e.amountPaid, 0);
+
+  const sortedData = useMemo(() => {
+    if (!dateSort) return data;
+    const dir = dateSort === 'asc' ? 1 : -1;
+    return [...data].sort((a, b) => {
+      if (!a.paidDate && !b.paidDate) return 0;
+      if (!a.paidDate) return 1;
+      if (!b.paidDate) return -1;
+      return a.paidDate.localeCompare(b.paidDate) * dir;
+    });
+  }, [data, dateSort]);
+
+  function toggleDateSort() {
+    setDateSort((d) => (d === 'asc' ? 'desc' : 'asc'));
+  }
 
   return (
     <div className={styles.page}>
@@ -57,7 +80,7 @@ export function AccountingPayments() {
           </div>
           <div className={styles.kpiCard}>
             <p className={styles.kpiLabel}>Total Collected</p>
-            <p className={`${styles.kpiValue} ${styles.kpiGreen}`}>${totalCollected.toFixed(2)}</p>
+            <p className={`${styles.kpiValue} ${styles.kpiGreen}`}>${formatMoney(totalCollected)}</p>
           </div>
         </div>
       )}
@@ -81,15 +104,23 @@ export function AccountingPayments() {
                     <th>Region</th>
                     <th className={styles.right}>Billed</th>
                     <th className={styles.right}>Paid</th>
+                    <th>
+                      <button type="button" className={styles.sortHeaderBtn} onClick={toggleDateSort}>
+                        Paid Date
+                        {dateSort
+                          ? (dateSort === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)
+                          : <ChevronsUpDown size={12} className={styles.sortIconIdle} />}
+                      </button>
+                    </th>
                     <th className={styles.right}>Remaining</th>
                     <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {data.length === 0 && (
-                    <tr><td colSpan={7} style={{ textAlign: 'center', color: '#6b7280', padding: '32px' }}>No payments recorded for this month.</td></tr>
+                  {sortedData.length === 0 && (
+                    <tr><td colSpan={8} style={{ textAlign: 'center', color: '#6b7280', padding: '32px' }}>No payments recorded for this month.</td></tr>
                   )}
-                  {data.map((e) => (
+                  {sortedData.map((e) => (
                     <tr key={e.consumptionId}>
                       <td>
                         <Link className={styles.customerLink} to={`/customers/${e.customerId}`}>
@@ -98,10 +129,11 @@ export function AccountingPayments() {
                       </td>
                       <td className={styles.muted}>{e.groupName}</td>
                       <td className={styles.muted}>{e.regionName}</td>
-                      <td className={styles.right}>${e.balance.toFixed(2)}</td>
-                      <td className={`${styles.right} ${styles.green}`}>${e.amountPaid.toFixed(2)}</td>
+                      <td className={styles.right}>${formatMoney(e.balance)}</td>
+                      <td className={`${styles.right} ${styles.green}`}>${formatMoney(e.amountPaid)}</td>
+                      <td className={styles.muted}>{fmtDate(e.paidDate)}</td>
                       <td className={`${styles.right} ${e.remaining > 0.001 ? styles.yellow : styles.muted}`}>
-                        ${e.remaining.toFixed(2)}
+                        ${formatMoney(e.remaining)}
                       </td>
                       <td>
                         <span style={{ fontSize: '0.75rem', color: e.closedBalance ? '#34d399' : '#9ca3af' }}>

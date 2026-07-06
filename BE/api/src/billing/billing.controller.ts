@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBody, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { BillingService } from './billing.service.js';
-import { BulkUpdateCountersDto, CreateMonthlyBillingDto, CustomerBalanceDto, MonthlyCounterEntryDto, MonthlyCustomerEntryDto, MonthlySummaryDto, UpdateMonthlyConsumptionDto } from './dto/billing.dto.js';
+import { BulkUpdateCountersDto, CreateMonthlyBillingDto, CreateSingleBillingDto, CustomerBalanceDto, GetReceiptsDto, MonthlyCounterEntryDto, MonthlyCustomerEntryDto, MonthlySummaryDto, ReceiptDto, UpdateMonthlyConsumptionDto } from './dto/billing.dto.js';
 
 @ApiTags('Billing')
 @Controller('billing')
@@ -67,6 +67,30 @@ export class BillingController {
     @Query('isCounter') isCounter: string,
   ) {
     return this.billingService.getMonthlyBillings(generatorGroupId, isCounter === 'true');
+  }
+
+  @Get('customer/:customerId/monthly-rate')
+  @ApiQuery({ name: 'month', required: true, description: 'YYYY-MM' })
+  getCustomerMonthlyRate(
+    @Param('customerId') customerId: string,
+    @Query('month') month: string,
+  ) {
+    return this.billingService.getCustomerMonthlyRate(customerId, month);
+  }
+
+  @Post('customer/:customerId/monthly')
+  @ApiBody({ type: CreateSingleBillingDto })
+  createSingleBilling(
+    @Param('customerId') customerId: string,
+    @Body() body: CreateSingleBillingDto,
+  ) {
+    return this.billingService.createSingleBilling(customerId, body);
+  }
+
+  @Post('receipts')
+  @ApiBody({ type: GetReceiptsDto })
+  getReceipts(@Body() body: GetReceiptsDto): Promise<ReceiptDto[]> {
+    return this.billingService.getReceipts(body.customerIds, body.months);
   }
 
   @Patch('monthly/:id')

@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { Printer } from 'lucide-react';
 import { useParams, Link } from 'react-router-dom';
 import {
   Users,
@@ -6,7 +7,6 @@ import {
   DollarSign,
   AlertTriangle,
   FolderTree,
-  Download,
   UserPlus,
   Building2,
   Pencil,
@@ -18,6 +18,7 @@ import {
   ChevronUp,
   ChevronsUpDown,
   Table2,
+  Gauge,
 } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { getGeneratorStatusStyle } from '../../app/data/mockData';
@@ -27,8 +28,14 @@ import { useConsumptionLookups } from '../../hooks/useConsumptionLookups';
 import { useCustomers } from '../../hooks/useCustomers';
 import { useBuildings } from '../../hooks/useBuildings';
 import { useCustomerBalances } from '../../hooks/useCustomerBalances';
+import { usePersistentState } from '../../hooks/usePersistentState';
 import { createCustomer, updateCustomer, createConsumptionType, type CustomerListItem, type ConsumptionTypeDto } from '../../api/customer/customer.api';
 import { createBuilding } from '../../api/building/building.api';
+import { getReceipts, getMonthlyCustomerBalances, type ReceiptData } from '../../api/billing/billing.api';
+import { formatMoney } from '../../utils/format';
+import { ReceiptPrintSheet } from '../../components/receipts/ReceiptPrintSheet';
+import { MeterReadingPrintSheet, type MeterReadingRow } from '../../components/receipts/MeterReadingPrintSheet';
+import { CollectionsPrintSheet, type CollectionsRow } from '../../components/receipts/CollectionsPrintSheet';
 import styles from '../GeneratorView/GeneratorView.module.css';
 
 type CustomerView = 'table' | 'byBuilding' | 'byType';
@@ -46,11 +53,6 @@ const EMPTY_CUSTOMER_FILTERS: CustomerColumnFilters = {
 
 function fullName(c: { firstName: string; middleName: string | null; lastName: string }) {
   return [c.firstName, c.middleName, c.lastName].filter(Boolean).join(' ');
-}
-
-function csvEscape(value: string | number): string {
-  const s = String(value);
-  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
 interface CustomerForm {
@@ -100,7 +102,7 @@ export function GeneratorGroupView() {
   const [buildingSubmitting, setBuildingSubmitting] = useState(false);
   const [buildingError, setBuildingError] = useState<string | null>(null);
   const [typeModalOpen, setTypeModalOpen] = useState(false);
-  const [typeForm, setTypeForm] = useState({ description: '', Ampere: '', isCounter: false, ThreePhase: false });
+  const [typeForm, setTypeForm] = useState({ description: '', Ampere: '', isCounter: false, ThreePhase: false, monthlyFee: '' });
   const [typeSubmitting, setTypeSubmitting] = useState(false);
   const [typeError, setTypeError] = useState<string | null>(null);
 
@@ -108,13 +110,27 @@ export function GeneratorGroupView() {
   const { data: balances } = useCustomerBalances(groupId, currentMonth);
 
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const [buildingSearch, setBuildingSearch] = useState('');
-  const [buildingSort, setBuildingSort] = useState<'name-asc' | 'name-desc' | 'floors-desc' | 'floors-asc'>('name-asc');
+  const [buildingSearch, setBuildingSearch] = usePersistentState('generatorGroupView.buildingSearch', '');
+  const [buildingSort, setBuildingSort] = usePersistentState<'name-asc' | 'name-desc' | 'floors-desc' | 'floors-asc'>('generatorGroupView.buildingSort', 'name-asc');
 
-  const [customerView, setCustomerView] = useState<CustomerView>('table');
-  const [sortKey, setSortKey] = useState<CustomerSortKey | null>(null);
-  const [sortDir, setSortDir] = useState<SortDir>('asc');
-  const [colFilters, setColFilters] = useState<CustomerColumnFilters>(EMPTY_CUSTOMER_FILTERS);
+  const [customerView, setCustomerView] = usePersistentState<CustomerView>('generatorGroupView.customerView', 'table');
+  const [sortKey, setSortKey] = usePersistentState<CustomerSortKey | null>('generatorGroupView.sortKey', null);
+  const [sortDir, setSortDir] = usePersistentState<SortDir>('generatorGroupView.sortDir', 'asc');
+  const [colFilters, setColFilters] = usePersistentState<CustomerColumnFilters>('generatorGroupView.colFilters', EMPTY_CUSTOMER_FILTERS);
+  const [groupSearch, setGroupSearch] = usePersistentState('generatorGroupView.groupSearch', '');
+  const [kpisCollapsed, setKpisCollapsed] = usePersistentState('generatorGroupView.kpisCollapsed', false);
+
+  const [printModalOpen, setPrintModalOpen] = useState(false);
+  const [printType, setPrintType] = useState<'receipts' | 'meterSheet' | 'collections'>('receipts');
+  const [printMonth, setPrintMonth] = useState(currentMonth);
+  const [printScope, setPrintScope] = useState<'building' | 'type'>('building');
+  const [printBuildingId, setPrintBuildingId] = useState('');
+  const [printIsCounter, setPrintIsCounter] = useState<'true' | 'false'>('true');
+  const [printReceipts, setPrintReceipts] = useState<ReceiptData[]>([]);
+  const [printMeterRows, setPrintMeterRows] = useState<MeterReadingRow[]>([]);
+  const [printCollectionRows, setPrintCollectionRows] = useState<CollectionsRow[]>([]);
+  const [printLoading, setPrintLoading] = useState(false);
+  const [printError, setPrintError] = useState<string | null>(null);
 
   const loading = genLoading || regLoading;
   const error = genError ?? regError;
@@ -170,7 +186,6 @@ export function GeneratorGroupView() {
   // group-level stats, so summing them multiplied the count by gen count).
   const totalClients = customers.length;
   const totalLoad = customers.reduce((sum, c) => sum + c.consumptionType.Ampere, 0);
-  const totalRevenue = 0;
   const overdueCount = customers.filter(
     (c) => c.consumptionStatus.Status.toLowerCase() === 'overdue',
   ).length;
@@ -222,18 +237,30 @@ export function GeneratorGroupView() {
   function renderRemaining(c: CustomerListItem) {
     const remaining = remainingOf(c);
     if (remaining === null) return <span className={styles.tdGray}>—</span>;
-    if (remaining <= 0.001) return <span className={styles.remainingPaid}>${remaining.toFixed(2)}</span>;
-    return <span className={styles.remainingOwing}>${remaining.toFixed(2)}</span>;
+    if (remaining <= 0.001) return <span className={styles.remainingPaid}>${formatMoney(remaining)}</span>;
+    return <span className={styles.remainingOwing}>${formatMoney(remaining)}</span>;
+  }
+
+  function renderMeterBadge(c: CustomerListItem) {
+    return c.isCounter ? (
+      <span className={`${styles.meterBadge} ${styles.meterBadgeCounter}`}>
+        <Gauge size={11} /> Counter
+      </span>
+    ) : (
+      <span className={`${styles.meterBadge} ${styles.meterBadgeFixed}`}>Fixed</span>
+    );
   }
 
   function sumRemaining(items: CustomerListItem[]): number {
     return items.reduce((sum, c) => sum + (remainingOf(c) ?? 0), 0);
   }
 
+  const totalOutstanding = sumRemaining(customers);
+
   function renderGroupRemainingBadge(totalRemaining: number) {
     return (
       <span className={totalRemaining > 0.001 ? styles.groupRemainingOwing : styles.groupRemainingPaid}>
-        ${totalRemaining.toFixed(2)} remaining
+        ${formatMoney(totalRemaining)} remaining
       </span>
     );
   }
@@ -341,8 +368,10 @@ export function GeneratorGroupView() {
       if (!groups.has(key)) groups.set(key, { label, items: [] });
       groups.get(key)!.items.push(c);
     }
+    const q = groupSearch.trim().toLowerCase();
     return Array.from(groups.entries())
       .map(([key, g]) => ({ key, ...g, totalRemaining: sumRemaining(g.items) }))
+      .filter((g) => !q || g.label.toLowerCase().includes(q))
       .sort((a, b) => (a.key === '__unassigned__' ? 1 : b.key === '__unassigned__' ? -1 : a.label.localeCompare(b.label)));
   })();
 
@@ -356,8 +385,10 @@ export function GeneratorGroupView() {
       }
       groups.get(key)!.items.push(c);
     }
+    const q = groupSearch.trim().toLowerCase();
     return Array.from(groups.entries())
       .map(([key, g]) => ({ key, ...g, totalRemaining: sumRemaining(g.items) }))
+      .filter((g) => !q || g.label.toLowerCase().includes(q))
       .sort((a, b) => a.label.localeCompare(b.label));
   })();
 
@@ -416,9 +447,10 @@ export function GeneratorGroupView() {
         Ampere: Number(typeForm.Ampere),
         isCounter: typeForm.isCounter,
         ThreePhase: typeForm.ThreePhase,
+        monthlyFee: typeForm.isCounter ? Number(typeForm.monthlyFee || 0) : undefined,
         generatorGroupId: groupId,
       });
-      setTypeForm({ description: '', Ampere: '', isCounter: false, ThreePhase: false });
+      setTypeForm({ description: '', Ampere: '', isCounter: false, ThreePhase: false, monthlyFee: '' });
       setTypeModalOpen(false);
       void refetchTypes();
     } catch {
@@ -445,44 +477,96 @@ export function GeneratorGroupView() {
     }
   }
 
-  function handleExportReport() {
-    const headers = [
-      'Name', 'Building', 'Floor', 'Subscription Type', 'Ampere', 'Phase',
-      'Counter', 'Bill Status', 'Status', 'Remaining',
-    ];
-    const rows = customers.map((c) => {
-      const remaining = remainingOf(c);
-      return [
-        fullName(c),
-        c.buildingFloor ? buildingNameOf(c) : '',
-        c.buildingFloor ? `Floor ${c.buildingFloor.floorNumber} ${c.buildingFloor.apartmentSide}` : '',
-        c.consumptionType.description,
-        c.consumptionType.Ampere,
-        c.consumptionType.ThreePhase ? '3-Phase' : '1-Phase',
-        c.isCounter ? 'Yes' : 'No',
-        c.consumptionStatus.Status,
-        c.status,
-        remaining === null ? '' : remaining.toFixed(2),
-      ];
-    });
-    const csvContent = [headers, ...rows]
-      .map((row) => row.map(csvEscape).join(','))
-      .join('\r\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const safeGroupName = groupLabel.replace(/[^a-z0-9]+/gi, '-').toLowerCase().replace(/^-+|-+$/g, '');
-    a.href = url;
-    a.download = `${safeGroupName || 'group'}-report-${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  async function handlePrintConfirm() {
+    if (!groupId) return;
+    setPrintLoading(true);
+    setPrintError(null);
+    // Only one print sheet should be mounted with data at a time — all three are
+    // absolutely positioned at the same spot for print, so leftover data from a
+    // previous print action would silently overlap/replace the new one.
+    setPrintReceipts([]);
+    setPrintMeterRows([]);
+    setPrintCollectionRows([]);
+    try {
+      if (printType === 'receipts') {
+        let ids: string[];
+        if (printScope === 'building') {
+          if (!printBuildingId) {
+            setPrintError('Select a building.');
+            return;
+          }
+          ids = customers.filter((c) => c.buildingFloor?.buildingId === printBuildingId).map((c) => c.id);
+        } else {
+          const wantCounter = printIsCounter === 'true';
+          ids = customers.filter((c) => c.isCounter === wantCounter).map((c) => c.id);
+        }
+        if (ids.length === 0) {
+          setPrintError('No customers match this selection.');
+          return;
+        }
+        const data = await getReceipts(ids, [printMonth]);
+        if (data.length === 0) {
+          setPrintError('No bills found for the selected month.');
+          return;
+        }
+        setPrintReceipts(data);
+      } else if (printType === 'meterSheet') {
+        const rows: MeterReadingRow[] = customers
+          .filter((c) => c.isCounter)
+          .filter((c) => !printBuildingId || c.buildingFloor?.buildingId === printBuildingId)
+          .map((c) => {
+            const bName = c.buildingFloor ? buildingNameOf(c) : '';
+            return {
+              customerId: c.id,
+              name: fullName(c),
+              buildingInfo: c.buildingFloor
+                ? `${bName} · Floor ${c.buildingFloor.floorNumber} ${c.buildingFloor.apartmentSide}`
+                : '—',
+              sortBuildingName: bName,
+            };
+          })
+          .sort((a, b) => a.sortBuildingName.localeCompare(b.sortBuildingName) || a.name.localeCompare(b.name))
+          .map((row) => ({ customerId: row.customerId, name: row.name, buildingInfo: row.buildingInfo }));
+        if (rows.length === 0) {
+          setPrintError('No counter customers match this selection.');
+          return;
+        }
+        setPrintMeterRows(rows);
+      } else {
+        const balances = await getMonthlyCustomerBalances(groupId, printMonth);
+        const balanceByCustomerId = new Map(balances.map((b) => [b.customerId, b]));
+        const rows: CollectionsRow[] = customers
+          .filter((c) => !printBuildingId || c.buildingFloor?.buildingId === printBuildingId)
+          .map((c) => ({
+            customerId: c.id,
+            name: fullName(c),
+            buildingInfo: c.buildingFloor ? buildingNameOf(c) : '—',
+            phoneNumber: c.phoneNumber ?? '—',
+            amountOwed: balanceByCustomerId.get(c.id)?.remaining ?? 0,
+          }))
+          .filter((r) => r.amountOwed > 0.001)
+          .sort((a, b) => a.buildingInfo.localeCompare(b.buildingInfo) || a.name.localeCompare(b.name));
+        if (rows.length === 0) {
+          setPrintError('No outstanding balances for the selected month.');
+          return;
+        }
+        setPrintCollectionRows(rows);
+      }
+      setPrintModalOpen(false);
+      setTimeout(() => window.print(), 100);
+    } catch {
+      setPrintError('Failed to prepare print data.');
+    } finally {
+      setPrintLoading(false);
+    }
   }
 
   return (
     <div className={styles.page}>
+      <ReceiptPrintSheet receipts={printReceipts} />
+      <MeterReadingPrintSheet title={`${groupLabel} — Meter Reading Sheet`} rows={printMeterRows} />
+      <CollectionsPrintSheet title={`${groupLabel} — Collections List`} rows={printCollectionRows} />
+
       <Dialog.Root
         open={modalOpen}
         onOpenChange={(open) => {
@@ -678,7 +762,7 @@ export function GeneratorGroupView() {
         open={typeModalOpen}
         onOpenChange={(open) => {
           setTypeModalOpen(open);
-          if (!open) { setTypeForm({ description: '', Ampere: '', isCounter: false, ThreePhase: false }); setTypeError(null); }
+          if (!open) { setTypeForm({ description: '', Ampere: '', isCounter: false, ThreePhase: false, monthlyFee: '' }); setTypeError(null); }
         }}
       >
         <Dialog.Portal>
@@ -726,6 +810,18 @@ export function GeneratorGroupView() {
                     </label>
                   </div>
                 </div>
+                {typeForm.isCounter && (
+                  <div className={styles.formField}>
+                    <label className={styles.formLabel}>Monthly Fee</label>
+                    <input
+                      type="number" min={0} step="any"
+                      className={styles.formInput}
+                      placeholder="e.g. 360"
+                      value={typeForm.monthlyFee}
+                      onChange={(e) => setTypeForm((p) => ({ ...p, monthlyFee: e.target.value }))}
+                    />
+                  </div>
+                )}
               </div>
               {typeError && <p style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '12px' }}>{typeError}</p>}
               <div className={styles.formActions}>
@@ -791,6 +887,156 @@ export function GeneratorGroupView() {
         </Dialog.Portal>
       </Dialog.Root>
 
+      {/* Print modal */}
+      <Dialog.Root
+        open={printModalOpen}
+        onOpenChange={(open) => {
+          setPrintModalOpen(open);
+          if (!open) setPrintError(null);
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay className={styles.dialogOverlay} />
+          <Dialog.Content className={styles.dialogContent} aria-describedby={undefined}>
+            <div className={styles.dialogHeader}>
+              <Dialog.Title className={styles.dialogTitle}>Print</Dialog.Title>
+              <Dialog.Close className={styles.dialogCloseBtn}><X size={18} /></Dialog.Close>
+            </div>
+
+            <div className={styles.formGrid}>
+              <div className={`${styles.formField} ${styles.formFieldFull}`}>
+                <label className={styles.formLabel}>What do you want to print?</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label className={styles.formCheckboxRow}>
+                    <input
+                      type="radio"
+                      name="printType"
+                      checked={printType === 'receipts'}
+                      onChange={() => setPrintType('receipts')}
+                    />
+                    <span className={styles.formCheckboxLabel}>Customer Receipts</span>
+                  </label>
+                  <label className={styles.formCheckboxRow}>
+                    <input
+                      type="radio"
+                      name="printType"
+                      checked={printType === 'meterSheet'}
+                      onChange={() => setPrintType('meterSheet')}
+                    />
+                    <span className={styles.formCheckboxLabel}>Meter Reading Sheet (blank column for manual counter entry)</span>
+                  </label>
+                  <label className={styles.formCheckboxRow}>
+                    <input
+                      type="radio"
+                      name="printType"
+                      checked={printType === 'collections'}
+                      onChange={() => setPrintType('collections')}
+                    />
+                    <span className={styles.formCheckboxLabel}>Collections List (name, building, phone, amount owed)</span>
+                  </label>
+                </div>
+              </div>
+
+              {(printType === 'receipts' || printType === 'collections') && (
+                <div className={`${styles.formField} ${styles.formFieldFull}`}>
+                  <label className={styles.formLabel}>Billing Month *</label>
+                  <input
+                    type="month"
+                    className={styles.formInput}
+                    value={printMonth}
+                    onChange={(e) => setPrintMonth(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
+
+              {printType === 'receipts' && (
+                <>
+                  <div className={`${styles.formField} ${styles.formFieldFull}`}>
+                    <label className={styles.formLabel}>Print By</label>
+                    <div style={{ display: 'flex', gap: '16px' }}>
+                      <label className={styles.formCheckboxRow}>
+                        <input
+                          type="radio"
+                          name="printScope"
+                          checked={printScope === 'building'}
+                          onChange={() => setPrintScope('building')}
+                        />
+                        <span className={styles.formCheckboxLabel}>Building</span>
+                      </label>
+                      <label className={styles.formCheckboxRow}>
+                        <input
+                          type="radio"
+                          name="printScope"
+                          checked={printScope === 'type'}
+                          onChange={() => setPrintScope('type')}
+                        />
+                        <span className={styles.formCheckboxLabel}>Counter / Fixed</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {printScope === 'building' ? (
+                    <div className={`${styles.formField} ${styles.formFieldFull}`}>
+                      <label className={styles.formLabel}>Building *</label>
+                      <select
+                        className={`${styles.formInput} ${styles.formSelect}`}
+                        value={printBuildingId}
+                        onChange={(e) => setPrintBuildingId(e.target.value)}
+                      >
+                        <option value="">Select building…</option>
+                        {buildings.map((b) => (
+                          <option key={b.id} value={b.id}>{b.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div className={`${styles.formField} ${styles.formFieldFull}`}>
+                      <label className={styles.formLabel}>Customer Type *</label>
+                      <select
+                        className={`${styles.formInput} ${styles.formSelect}`}
+                        value={printIsCounter}
+                        onChange={(e) => setPrintIsCounter(e.target.value as 'true' | 'false')}
+                      >
+                        <option value="true">Counter (metered)</option>
+                        <option value="false">Fixed (Ampere)</option>
+                      </select>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {(printType === 'meterSheet' || printType === 'collections') && (
+                <div className={`${styles.formField} ${styles.formFieldFull}`}>
+                  <label className={styles.formLabel}>Building</label>
+                  <select
+                    className={`${styles.formInput} ${styles.formSelect}`}
+                    value={printBuildingId}
+                    onChange={(e) => setPrintBuildingId(e.target.value)}
+                  >
+                    <option value="">All buildings</option>
+                    {buildings.map((b) => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {printError && (
+              <p style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '12px' }}>{printError}</p>
+            )}
+
+            <div className={styles.formActions}>
+              <Dialog.Close className={styles.btnCancel} type="button" disabled={printLoading}>Cancel</Dialog.Close>
+              <button type="button" className={styles.btnSubmit} onClick={handlePrintConfirm} disabled={printLoading}>
+                {printLoading ? 'Loading…' : 'Print'}
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
       <div className={styles.genHeader}>
         <div className={styles.genHeaderTop}>
           <div>
@@ -829,9 +1075,9 @@ export function GeneratorGroupView() {
               <UserPlus size={16} />
               Add Customer
             </button>
-            <button className={styles.exportBtn} onClick={handleExportReport} disabled={customers.length === 0}>
-              <Download size={16} />
-              Export Report
+            <button className={styles.exportBtn} onClick={() => setPrintModalOpen(true)} disabled={customers.length === 0}>
+              <Printer size={16} />
+              Print
             </button>
           </div>
         </div>
@@ -855,49 +1101,61 @@ export function GeneratorGroupView() {
       </div>
 
       <div className={styles.content}>
-        <div className={styles.kpiGrid}>
-          <MiniStat
-            icon={<Users size={16} color="#60a5fa" />}
-            label="Total Clients"
-            value={totalClients.toString()}
-            cardClass={styles.miniStatBlue}
-          />
-          <MiniStat
-            icon={<Zap size={16} color="#facc15" />}
-            label="Total Load"
-            value={`${totalLoad.toFixed(1)} A`}
-            cardClass={styles.miniStatYellow}
-          />
-          <MiniStat
-            icon={<DollarSign size={16} color="#34d399" />}
-            label="Monthly Revenue"
-            value={`$${totalRevenue.toFixed(2)}`}
-            cardClass={styles.miniStatEmerald}
-          />
-          <MiniStat
-            icon={<AlertTriangle size={16} color="#f87171" />}
-            label="Payment Alerts"
-            value={`${overdueCount + unpaidCount}`}
-            sub={`${overdueCount} overdue · ${unpaidCount} unpaid`}
-            cardClass={styles.miniStatRed}
-          />
-        </div>
+        <div className={styles.kpiSection}>
+          <button type="button" className={styles.kpiSectionHeader} onClick={() => setKpisCollapsed((v) => !v)}>
+            {kpisCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+            <span>Overview</span>
+          </button>
 
-        <div className={styles.statusPillsRow}>
-          <div className={`${styles.statusPill} ${styles.pillPaid}`}>
-            <p className={`${styles.pillLabel} ${styles.pillLabelPaid}`}>Paid</p>
-            <p className={`${styles.pillCount} ${styles.pillCountPaid}`}>{paidCount}</p>
-          </div>
+          {!kpisCollapsed && (
+            <>
+            <div className={styles.kpiGrid}>
+              <MiniStat
+                icon={<Users size={16} color="#60a5fa" />}
+                label="Total Clients"
+                value={totalClients.toString()}
+                cardClass={styles.miniStatBlue}
+              />
+              <MiniStat
+                icon={<Zap size={16} color="#facc15" />}
+                label="Total Load"
+                value={`${totalLoad.toFixed(1)} A`}
+                cardClass={styles.miniStatYellow}
+              />
+              <MiniStat
+                icon={<DollarSign size={16} color="#f87171" />}
+                label="Outstanding"
+                value={`$${formatMoney(totalOutstanding)}`}
+                sub="Left to collect from clients"
+                cardClass={styles.miniStatRed}
+              />
+              <MiniStat
+                icon={<AlertTriangle size={16} color="#f87171" />}
+                label="Payment Alerts"
+                value={`${overdueCount + unpaidCount}`}
+                sub={`${overdueCount} overdue · ${unpaidCount} unpaid`}
+                cardClass={styles.miniStatRed}
+              />
+            </div>
 
-          <div className={`${styles.statusPill} ${styles.pillUnpaid}`}>
-            <p className={`${styles.pillLabel} ${styles.pillLabelUnpaid}`}>Unpaid</p>
-            <p className={`${styles.pillCount} ${styles.pillCountUnpaid}`}>{unpaidCount}</p>
-          </div>
+            <div className={styles.statusPillsRow}>
+              <div className={`${styles.statusPill} ${styles.pillPaid}`}>
+                <p className={`${styles.pillLabel} ${styles.pillLabelPaid}`}>Paid</p>
+                <p className={`${styles.pillCount} ${styles.pillCountPaid}`}>{paidCount}</p>
+              </div>
 
-          <div className={`${styles.statusPill} ${styles.pillOverdue}`}>
-            <p className={`${styles.pillLabel} ${styles.pillLabelOverdue}`}>Overdue</p>
-            <p className={`${styles.pillCount} ${styles.pillCountOverdue}`}>{overdueCount}</p>
-          </div>
+              <div className={`${styles.statusPill} ${styles.pillUnpaid}`}>
+                <p className={`${styles.pillLabel} ${styles.pillLabelUnpaid}`}>Unpaid</p>
+                <p className={`${styles.pillCount} ${styles.pillCountUnpaid}`}>{unpaidCount}</p>
+              </div>
+
+              <div className={`${styles.statusPill} ${styles.pillOverdue}`}>
+                <p className={`${styles.pillLabel} ${styles.pillLabelOverdue}`}>Overdue</p>
+                <p className={`${styles.pillCount} ${styles.pillCountOverdue}`}>{overdueCount}</p>
+              </div>
+            </div>
+            </>
+          )}
         </div>
 
         {/* Customer table */}
@@ -912,6 +1170,18 @@ export function GeneratorGroupView() {
             <button className={`${styles.filterBtn} ${customerView === 'byType' ? styles.filterBtnActive : ''}`} onClick={() => setCustomerView('byType')}>
               <Zap size={13} /> By Subscription Type
             </button>
+          </div>
+        )}
+
+        {!customersLoading && customers.length > 0 && (customerView === 'byBuilding' || customerView === 'byType') && (
+          <div className={styles.searchWrap} style={{ maxWidth: 320, marginBottom: 12 }}>
+            <Search size={15} className={styles.searchIcon} />
+            <input
+              className={styles.searchInput}
+              placeholder={customerView === 'byBuilding' ? 'Search building…' : 'Search subscription type…'}
+              value={groupSearch}
+              onChange={(e) => setGroupSearch(e.target.value)}
+            />
           </div>
         )}
 
@@ -1029,9 +1299,7 @@ export function GeneratorGroupView() {
                         </td>
                         <td className={`${styles.td} ${styles.tdGray}`}>{c.status}</td>
                         <td className={`${styles.td} ${styles.tdCenter}`}>
-                          <span style={{ color: c.isCounter ? '#34d399' : '#4b5563', fontSize: '0.75rem', fontWeight: 500 }}>
-                            {c.isCounter ? 'Yes' : 'No'}
-                          </span>
+                          {renderMeterBadge(c)}
                         </td>
                         <td className={styles.td}>{renderRemaining(c)}</td>
                         <td className={`${styles.td} ${styles.tdCenter}`}>
@@ -1047,6 +1315,9 @@ export function GeneratorGroupView() {
             </div>
           </div>
         ) : customerView === 'byBuilding' ? (
+          customersByBuilding.length === 0 ? (
+            <p style={{ padding: '24px 0', textAlign: 'center', color: 'var(--tx-5)' }}>No buildings match.</p>
+          ) : (
           <div className={`${styles.buildingList} ${styles.scrollPane}`}>
             {customersByBuilding.map((g) => {
               const key = `building:${g.key}`;
@@ -1089,6 +1360,9 @@ export function GeneratorGroupView() {
               );
             })}
           </div>
+          )
+        ) : customersByType.length === 0 ? (
+          <p style={{ padding: '24px 0', textAlign: 'center', color: 'var(--tx-5)' }}>No subscription types match.</p>
         ) : (
           <div className={`${styles.buildingList} ${styles.scrollPane}`}>
             {customersByType.map((g) => {

@@ -14,7 +14,9 @@ interface SimpleBarChartProps {
   formatValue?: (v: number) => string;
 }
 
-const PAD = { top: 16, right: 16, bottom: 36, left: 52 };
+const PAD_BASE = { top: 16, right: 16, bottom: 36, left: 52 };
+const PAD_ROTATED_BOTTOM = 74;
+const AVG_CHAR_WIDTH = 6;
 
 function niceMax(v: number): number {
   if (v === 0) return 10;
@@ -62,12 +64,19 @@ export function SimpleBarChart({
     return () => ro.disconnect();
   }, []);
 
-  const cw = width - PAD.left - PAD.right;
-  const ch = height - PAD.top - PAD.bottom;
+  const cw = width - PAD_BASE.left - PAD_BASE.right;
+  const slotW = data.length > 0 ? cw / data.length : cw;
+  const longestLabelLen = data.reduce((max, d) => Math.max(max, d.name.length), 0);
+  const needsRotation = longestLabelLen * AVG_CHAR_WIDTH > slotW - 8;
+  const PAD = { ...PAD_BASE, bottom: needsRotation ? PAD_ROTATED_BOTTOM : PAD_BASE.bottom };
+  // Keep the plotted bar area the same regardless of rotation — grow the
+  // total SVG height instead of stealing room from the bars themselves.
+  const svgHeight = height + (PAD.bottom - PAD_BASE.bottom);
+
+  const ch = svgHeight - PAD.top - PAD.bottom;
   const maxVal = niceMax(Math.max(...data.map((d) => d.value), 0));
   const ticks = yTicks(maxVal);
 
-  const slotW = data.length > 0 ? cw / data.length : cw;
   const barW = Math.max(4, slotW * 0.55);
   const r = Math.min(5, barW / 2);
 
@@ -80,7 +89,7 @@ export function SimpleBarChart({
     <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
       <svg
         width={width}
-        height={height}
+        height={svgHeight}
         style={{ display: 'block', overflow: 'visible' }}
       >
         {/* Grid lines + Y labels */}
@@ -104,7 +113,7 @@ export function SimpleBarChart({
                 fontSize={11}
                 fontFamily="inherit"
               >
-                {tick % 1 === 0 ? tick : tick.toFixed(1)}
+                {fmt(tick)}
               </text>
             </g>
           );
@@ -146,7 +155,8 @@ export function SimpleBarChart({
               <text
                 x={xOf(i)}
                 y={PAD.top + ch + 20}
-                textAnchor="middle"
+                textAnchor={needsRotation ? 'end' : 'middle'}
+                transform={needsRotation ? `rotate(-35 ${xOf(i)} ${PAD.top + ch + 20})` : undefined}
                 fill="#6b7280"
                 fontSize={11}
                 fontFamily="inherit"

@@ -40,6 +40,7 @@ export class CustomerService {
         Ampere: true,
         isCounter: true,
         ThreePhase: true,
+        monthlyFee: true,
       },
     });
   }
@@ -112,7 +113,9 @@ export class CustomerService {
             previousCounter: true,
             currentCounter: true,
             monthlyFee: true,
+            balanceOverride: true,
             amountPaid: true,
+            paidDate: true,
             kwhPrice: true,
             isCut: true,
             closedBalance: true,

@@ -29,6 +29,7 @@ export interface ConsumptionTypeDto {
   Ampere: number;
   isCounter: boolean;
   ThreePhase: boolean;
+  monthlyFee: number;
 }
 
 export interface CustomerListItem {
@@ -89,6 +90,7 @@ export interface CreateConsumptionTypePayload {
   Ampere: number;
   isCounter: boolean;
   ThreePhase: boolean;
+  monthlyFee?: number;
   generatorGroupId: string;
 }
 
@@ -109,6 +111,7 @@ export interface UpdateConsumptionTypePayload {
   Ampere?: number;
   isCounter?: boolean;
   ThreePhase?: boolean;
+  monthlyFee?: number;
 }
 
 export const updateConsumptionType = async (id: string, payload: UpdateConsumptionTypePayload) => {
@@ -130,7 +133,9 @@ export interface MonthlyConsumptionRecord {
   previousCounter: number;
   currentCounter: number;
   monthlyFee: number;
+  balanceOverride: number | null;
   amountPaid: number;
+  paidDate: string | null;
   kwhPrice: number;
   isCut: boolean;
   closedBalance: boolean;

@@ -1,0 +1,73 @@
+.listPrintRoot {
+  display: none;
+}
+
+@media print {
+  @page list {
+    size: A4;
+    margin: 15mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .listPrintRoot,
+  .listPrintRoot * {
+    visibility: visible;
+  }
+
+  .listPrintRoot {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+}
+
+.listPage {
+  page: list;
+  font-family: Arial, sans-serif;
+  color: #000;
+  background: #fff;
+}
+
+.listTitle {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.listSubtitle {
+  margin: 0 0 16px;
+  font-size: 12px;
+  color: #444;
+}
+
+.listTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.listTable th,
+.listTable td {
+  border: 1px solid #000;
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.listTable th {
+  background: #f0f0f0;
+  font-weight: 700;
+}
+
+.blankCell {
+  min-width: 140px;
+}

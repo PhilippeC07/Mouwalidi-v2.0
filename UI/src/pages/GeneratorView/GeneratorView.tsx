@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { getGeneratorStatusStyle } from '../../app/data/mockData';
 import { useGetGenerators } from '../../hooks/useGetGenerators';
+import { formatMoney } from '../../utils/format';
 import styles from './GeneratorView.module.css';
 
 export function GeneratorView() {
@@ -146,7 +147,7 @@ export function GeneratorView() {
           <MiniStat
             icon={<DollarSign size={16} color="#34d399" />}
             label="Monthly Revenue"
-            value={`$${generator.totalRevenue.toFixed(2)}`}
+            value={`$${formatMoney(generator.totalRevenue)}`}
             cardClass={styles.miniStatEmerald}
           />
           <MiniStat

@@ -66,6 +66,7 @@ export class MonthlyCustomerEntryDto {
   @ApiProperty() remaining!: number;
   @ApiProperty() status!: string;
   @ApiProperty() closedBalance!: boolean;
+  @ApiProperty({ required: false, nullable: true }) paidDate!: string | null;
 }
 
 export class CustomerBalanceDto {
@@ -99,6 +100,43 @@ export class BulkUpdateCountersDto {
   updates!: CounterUpdateItemDto[];
 }
 
+export class CreateSingleBillingDto {
+  @ApiProperty({ example: '2025-01', description: 'Month in YYYY-MM format' })
+  month!: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'kWh price (counter) or price per Amp (fixed). Required only if no billing rate exists yet for this month/group/type.',
+  })
+  price?: number;
+}
+
+export class GetReceiptsDto {
+  @ApiProperty({ type: [String], description: 'Customer IDs to fetch receipts for' })
+  customerIds!: string[];
+
+  @ApiProperty({ type: [String], example: ['2025-01'], description: 'Months in YYYY-MM format' })
+  months!: string[];
+}
+
+export class ReceiptDto {
+  @ApiProperty() consumptionId!: string;
+  @ApiProperty() customerId!: string;
+  @ApiProperty() customerName!: string;
+  @ApiProperty({ nullable: true, required: false }) buildingName!: string | null;
+  @ApiProperty() date!: string;
+  @ApiProperty() isCounter!: boolean;
+  @ApiProperty() ampere!: number;
+  @ApiProperty() threePhase!: boolean;
+  @ApiProperty() monthlyFee!: number;
+  @ApiProperty() previousCounter!: number;
+  @ApiProperty() currentCounter!: number;
+  @ApiProperty() kwhPrice!: number;
+  @ApiProperty() amountPaid!: number;
+  @ApiProperty() balance!: number;
+  @ApiProperty() remaining!: number;
+}
+
 export class UpdateMonthlyConsumptionDto {
   @ApiProperty({ required: false })
   previousCounter?: number;
@@ -109,8 +147,14 @@ export class UpdateMonthlyConsumptionDto {
   @ApiProperty({ required: false })
   monthlyFee?: number;
 
+  @ApiProperty({ required: false, nullable: true, description: 'Manual balance override, bypassing the usage/fee formula. Pass null to revert to the computed balance.' })
+  balanceOverride?: number | null;
+
   @ApiProperty({ required: false })
   amountPaid?: number;
+
+  @ApiProperty({ required: false, description: 'Date the payment was made (ISO date, e.g. 2026-07-05)' })
+  paidDate?: string;
 
   @ApiProperty({ required: false })
   consumptionStatusId?: string;

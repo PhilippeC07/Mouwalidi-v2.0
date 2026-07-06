@@ -77,6 +77,18 @@
 /* ── Main Content ── */
 .content { padding: 24px; display: flex; flex-direction: column; gap: 24px; }
 
+/* ── Collapsible KPI section ── */
+.kpiSection { display: flex; flex-direction: column; gap: 14px; }
+
+.kpiSectionHeader {
+  display: inline-flex; align-items: center; gap: 6px; align-self: flex-start;
+  background: none; border: none; cursor: pointer; padding: 2px 0;
+  color: var(--tx-4); font-size: 0.78rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  transition: color 0.15s;
+}
+.kpiSectionHeader:hover { color: var(--tx-1); }
+
 /* ── Mini KPI Grid ── */
 .kpiGrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
 
@@ -227,6 +239,11 @@
 /* Inline status badge */
 .inlineStatus { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 500; text-transform: capitalize; }
 .inlineDot    { width: 6px; height: 6px; border-radius: 50%; background-color: currentColor; flex-shrink: 0; }
+
+/* Meter type badge (Counter vs Fixed) */
+.meterBadge        { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; font-size: 0.7rem; font-weight: 600; white-space: nowrap; }
+.meterBadgeCounter { background: rgba(52,211,153,0.12); color: #34d399; border: 1px solid rgba(52,211,153,0.25); }
+.meterBadgeFixed   { background: rgba(107,114,128,0.12); color: #9ca3af; border: 1px solid rgba(107,114,128,0.25); }
 
 /* Expand button */
 .expandBtn {

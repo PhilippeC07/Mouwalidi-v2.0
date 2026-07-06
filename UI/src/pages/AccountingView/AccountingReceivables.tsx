@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { getMonthlyReceivables, type MonthlyCustomerEntry } from '../../api/billing/billing.api';
+import { formatMoney } from '../../utils/format';
 import styles from './AccountingView.module.css';
 
 function fmtMonth(m: string) {
@@ -58,7 +59,7 @@ export function AccountingReceivables() {
           <div className={styles.kpiCard}>
             <p className={styles.kpiLabel}>Total Outstanding</p>
             <p className={`${styles.kpiValue} ${totalOutstanding > 0 ? styles.kpiRed : styles.kpiGreen}`}>
-              ${totalOutstanding.toFixed(2)}
+              ${formatMoney(totalOutstanding)}
             </p>
           </div>
         </div>
@@ -100,9 +101,9 @@ export function AccountingReceivables() {
                       </td>
                       <td className={styles.muted}>{e.groupName}</td>
                       <td className={styles.muted}>{e.regionName}</td>
-                      <td className={styles.right}>${e.balance.toFixed(2)}</td>
-                      <td className={`${styles.right} ${styles.green}`}>${e.amountPaid.toFixed(2)}</td>
-                      <td className={`${styles.right} ${styles.red}`}>${e.remaining.toFixed(2)}</td>
+                      <td className={styles.right}>${formatMoney(e.balance)}</td>
+                      <td className={`${styles.right} ${styles.green}`}>${formatMoney(e.amountPaid)}</td>
+                      <td className={`${styles.right} ${styles.red}`}>${formatMoney(e.remaining)}</td>
                       <td>
                         <span style={{ fontSize: '0.75rem', color: '#fbbf24' }}>{e.status}</span>
                       </td>

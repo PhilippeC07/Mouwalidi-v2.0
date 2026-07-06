@@ -12,6 +12,7 @@ import { useCustomers } from '../../hooks/useCustomers';
 import { useRegions } from '../../hooks/useGetRegions';
 import { useMonthlyCounterEntries } from '../../hooks/useMonthlyCounterEntries';
 import { useCustomerBalances } from '../../hooks/useCustomerBalances';
+import { usePersistentState } from '../../hooks/usePersistentState';
 import { bulkUpdateCounters } from '../../api/billing/billing.api';
 import {
   updateCustomer, deleteCustomer,
@@ -22,6 +23,7 @@ import {
   updateBuilding, deleteBuilding,
   type BuildingDetail,
 } from '../../api/building/building.api';
+import { formatMoney } from '../../utils/format';
 import styles from './GroupManagementView.module.css';
 
 type Tab = 'types' | 'buildings' | 'customers' | 'readings';
@@ -67,23 +69,24 @@ const EMPTY_CUSTOMER: CustomerForm = {
   floorNumber: '', apartmentSide: '',
 };
 
-interface TypeForm { description: string; Ampere: string; isCounter: boolean; ThreePhase: boolean; }
+interface TypeForm { description: string; Ampere: string; isCounter: boolean; ThreePhase: boolean; monthlyFee: string; }
 
 export function GroupManagementView() {
   const { groupId } = useParams<{ groupId: string }>();
-  const [activeTab, setActiveTab] = useState<Tab>('types');
+  const [activeTab, setActiveTab] = usePersistentState<Tab>('groupManagementView.activeTab', 'types');
   const [expandedBuildings, setExpandedBuildings] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   // ── Buildings tab: search + sort ──
-  const [buildingSearch, setBuildingSearch] = useState('');
-  const [buildingSort, setBuildingSort] = useState<'name-asc' | 'name-desc' | 'floors-desc' | 'floors-asc'>('name-asc');
+  const [buildingSearch, setBuildingSearch] = usePersistentState('groupManagementView.buildingSearch', '');
+  const [buildingSort, setBuildingSort] = usePersistentState<'name-asc' | 'name-desc' | 'floors-desc' | 'floors-asc'>('groupManagementView.buildingSort', 'name-asc');
 
   // ── Customers tab: view switcher + table sort/filter ──
-  const [customerView, setCustomerView] = useState<CustomerView>('table');
-  const [sortKey, setSortKey] = useState<CustomerSortKey | null>(null);
-  const [sortDir, setSortDir] = useState<SortDir>('asc');
-  const [colFilters, setColFilters] = useState<CustomerColumnFilters>(EMPTY_CUSTOMER_FILTERS);
+  const [customerView, setCustomerView] = usePersistentState<CustomerView>('groupManagementView.customerView', 'table');
+  const [sortKey, setSortKey] = usePersistentState<CustomerSortKey | null>('groupManagementView.sortKey', null);
+  const [sortDir, setSortDir] = usePersistentState<SortDir>('groupManagementView.sortDir', 'asc');
+  const [colFilters, setColFilters] = usePersistentState<CustomerColumnFilters>('groupManagementView.colFilters', EMPTY_CUSTOMER_FILTERS);
+  const [groupSearch, setGroupSearch] = usePersistentState('groupManagementView.groupSearch', '');
 
   const { data: regions } = useRegions();
   const { statuses, types, loading: typesLoading, refetchTypes } = useConsumptionLookups(groupId);
@@ -121,11 +124,11 @@ export function GroupManagementView() {
   } = useMonthlyCounterEntries(groupId, month);
   const { data: balances } = useCustomerBalances(groupId, month);
   const [edits, setEdits] = useState<Record<string, number>>({});
-  const [counterSearch, setCounterSearch] = useState('');
-  const [pendingOnly, setPendingOnly] = useState(false);
-  const [counterBuildingFilter, setCounterBuildingFilter] = useState('');
-  const [counterSortKey, setCounterSortKey] = useState<CounterSortKey | null>(null);
-  const [counterSortDir, setCounterSortDir] = useState<SortDir>('asc');
+  const [counterSearch, setCounterSearch] = usePersistentState('groupManagementView.counterSearch', '');
+  const [pendingOnly, setPendingOnly] = usePersistentState('groupManagementView.pendingOnly', false);
+  const [counterBuildingFilter, setCounterBuildingFilter] = usePersistentState('groupManagementView.counterBuildingFilter', '');
+  const [counterSortKey, setCounterSortKey] = usePersistentState<CounterSortKey | null>('groupManagementView.counterSortKey', null);
+  const [counterSortDir, setCounterSortDir] = usePersistentState<SortDir>('groupManagementView.counterSortDir', 'asc');
   const [counterSaving, setCounterSaving] = useState(false);
   const [counterSaveMsg, setCounterSaveMsg] = useState<string | null>(null);
   const [counterSaveErr, setCounterSaveErr] = useState<string | null>(null);
@@ -243,6 +246,9 @@ export function GroupManagementView() {
         <div className={styles.typeCardFooter}>
           <Users size={12} />
           {customersPerType[t.id] ?? 0} customer{(customersPerType[t.id] ?? 0) !== 1 ? 's' : ''}
+          {t.isCounter && t.monthlyFee > 0 && (
+            <span style={{ marginLeft: 'auto' }}>${formatMoney(t.monthlyFee)}/mo</span>
+          )}
         </div>
       </div>
     );
@@ -260,8 +266,8 @@ export function GroupManagementView() {
   function renderRemaining(c: CustomerListItem) {
     const remaining = remainingOf(c);
     if (remaining === null) return <span className={styles.noCustomer}>—</span>;
-    if (remaining <= 0.001) return <span className={styles.remainingPaid}>${remaining.toFixed(2)}</span>;
-    return <span className={styles.remainingOwing}>${remaining.toFixed(2)}</span>;
+    if (remaining <= 0.001) return <span className={styles.remainingPaid}>${formatMoney(remaining)}</span>;
+    return <span className={styles.remainingOwing}>${formatMoney(remaining)}</span>;
   }
 
   function sumRemaining(items: CustomerListItem[]): number {
@@ -271,7 +277,7 @@ export function GroupManagementView() {
   function renderGroupRemainingBadge(totalRemaining: number) {
     return (
       <span className={totalRemaining > 0.001 ? styles.groupRemainingOwing : styles.groupRemainingPaid}>
-        ${totalRemaining.toFixed(2)} remaining
+        ${formatMoney(totalRemaining)} remaining
       </span>
     );
   }
@@ -392,11 +398,13 @@ export function GroupManagementView() {
       if (!groups.has(key)) groups.set(key, { label, items: [] });
       groups.get(key)!.items.push(c);
     }
+    const q = groupSearch.trim().toLowerCase();
     return Array.from(groups.entries())
       .map(([key, g]) => ({ key, ...g, totalRemaining: sumRemaining(g.items) }))
+      .filter((g) => !q || g.label.toLowerCase().includes(q))
       .sort((a, b) => (a.key === '__unassigned__' ? 1 : b.key === '__unassigned__' ? -1 : a.label.localeCompare(b.label)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customers, buildingNameById, balanceByCustomerId]);
+  }, [customers, buildingNameById, balanceByCustomerId, groupSearch]);
 
   const customersByType = useMemo(() => {
     const groups = new Map<string, { type: ConsumptionTypeDto | undefined; label: string; items: CustomerListItem[] }>();
@@ -408,16 +416,18 @@ export function GroupManagementView() {
       }
       groups.get(key)!.items.push(c);
     }
+    const q = groupSearch.trim().toLowerCase();
     return Array.from(groups.entries())
       .map(([key, g]) => ({ key, ...g, totalRemaining: sumRemaining(g.items) }))
+      .filter((g) => !q || g.label.toLowerCase().includes(q))
       .sort((a, b) => a.label.localeCompare(b.label));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customers, types, balanceByCustomerId]);
+  }, [customers, types, balanceByCustomerId, groupSearch]);
 
   // ── Edit Type ──
   const [editTypeOpen, setEditTypeOpen] = useState(false);
   const [editingTypeId, setEditingTypeId] = useState<string | null>(null);
-  const [typeForm, setTypeForm] = useState<TypeForm>({ description: '', Ampere: '', isCounter: false, ThreePhase: false });
+  const [typeForm, setTypeForm] = useState<TypeForm>({ description: '', Ampere: '', isCounter: false, ThreePhase: false, monthlyFee: '' });
   const [typeSubmitting, setTypeSubmitting] = useState(false);
   const [typeError, setTypeError] = useState<string | null>(null);
 
@@ -452,7 +462,7 @@ export function GroupManagementView() {
 
   function openEditType(t: ConsumptionTypeDto) {
     setEditingTypeId(t.id);
-    setTypeForm({ description: t.description, Ampere: String(t.Ampere), isCounter: t.isCounter, ThreePhase: t.ThreePhase });
+    setTypeForm({ description: t.description, Ampere: String(t.Ampere), isCounter: t.isCounter, ThreePhase: t.ThreePhase, monthlyFee: String(t.monthlyFee ?? 0) });
     setTypeError(null);
     setEditTypeOpen(true);
   }
@@ -495,6 +505,7 @@ export function GroupManagementView() {
         Ampere: Number(typeForm.Ampere),
         isCounter: typeForm.isCounter,
         ThreePhase: typeForm.ThreePhase,
+        monthlyFee: typeForm.isCounter ? Number(typeForm.monthlyFee || 0) : 0,
       });
       setEditTypeOpen(false);
       void refetchTypes();
@@ -601,6 +612,13 @@ export function GroupManagementView() {
                     <label className={styles.formCheckboxLabel} htmlFor="etThreePhase">3-Phase</label>
                   </div>
                 </div>
+                {typeForm.isCounter && (
+                  <div className={styles.formField}>
+                    <label className={styles.formLabel}>Monthly Fee</label>
+                    <input className={styles.formInput} type="number" min={0} step="any" value={typeForm.monthlyFee}
+                      onChange={(e) => setTypeForm((p) => ({ ...p, monthlyFee: e.target.value }))} />
+                  </div>
+                )}
               </div>
               {typeError && <p className={styles.formError}>{typeError}</p>}
               <div className={styles.formActions}>
@@ -957,6 +975,18 @@ export function GroupManagementView() {
               </span>
             </div>
 
+            {(customerView === 'byBuilding' || customerView === 'byType') && (
+              <div className={styles.readingsSearchWrap} style={{ maxWidth: 280, marginBottom: 12 }}>
+                <Search size={13} className={styles.readingsSearchIcon} />
+                <input
+                  className={styles.readingsSearchInput}
+                  placeholder={customerView === 'byBuilding' ? 'Search building…' : 'Search subscription type…'}
+                  value={groupSearch}
+                  onChange={(e) => setGroupSearch(e.target.value)}
+                />
+              </div>
+            )}
+
             {customersLoading ? <p className={styles.empty}>Loading…</p> : customers.length === 0 ? (
               <p className={styles.empty}>No customers yet.</p>
             ) : customerView === 'table' ? (
@@ -1082,6 +1112,9 @@ export function GroupManagementView() {
                 </table>
               </div>
             ) : customerView === 'byBuilding' ? (
+              customersByBuilding.length === 0 ? (
+                <p className={styles.empty}>No buildings match.</p>
+              ) : (
               <div className={`${styles.buildingList} ${styles.scrollPane}`}>
                 {customersByBuilding.map((g) => {
                   const key = `building:${g.key}`;
@@ -1123,6 +1156,9 @@ export function GroupManagementView() {
                   );
                 })}
               </div>
+              )
+            ) : customersByType.length === 0 ? (
+              <p className={styles.empty}>No subscription types match.</p>
             ) : (
               <div className={`${styles.buildingList} ${styles.scrollPane}`}>
                 {customersByType.map((g) => {
@@ -1248,7 +1284,7 @@ export function GroupManagementView() {
                             <Link to={`/customers/${e.customerId}`} className={styles.customerLink}>{e.customerName}</Link>
                           </td>
                           <td className={styles.noCustomer}>{buildingNameOfCustomerId(e.customerId) || '—'}</td>
-                          <td>${e.kwhPrice.toFixed(3)}</td>
+                          <td>${formatMoney(e.kwhPrice, 3)}</td>
                           <td>{e.previousCounter}</td>
                           <td>
                             <input
@@ -1263,7 +1299,7 @@ export function GroupManagementView() {
                             />
                           </td>
                           <td style={isNegative ? { color: '#f87171', fontWeight: 600 } : undefined}>{usage}</td>
-                          <td>${(usage * e.kwhPrice).toFixed(2)}</td>
+                          <td>${formatMoney(usage * e.kwhPrice)}</td>
                         </tr>
                       );
                     })}

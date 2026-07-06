@@ -2,15 +2,33 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { getMonthlySummary, type MonthlySummary } from '../../api/billing/billing.api';
+import { formatMoney } from '../../utils/format';
+import { usePersistentState } from '../../hooks/usePersistentState';
+import { SimpleLineChart } from '../../app/components/SimpleLineChart';
+import { SimpleBarChart } from '../../app/components/SimpleBarChart';
 import styles from './AccountingView.module.css';
 
 function fmtMonth(m: string) {
   return new Date(m + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 }
 
+function fmtMonthShort(m: string) {
+  return new Date(m + '-01').toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' });
+}
+
 function shiftMonth(m: string, delta: number) {
   const [y, mo] = m.split('-').map(Number);
   return new Date(Date.UTC(y, mo - 1 + delta, 1)).toISOString().slice(0, 7);
+}
+
+function lastNMonths(month: string, n: number): string[] {
+  const [y, mo] = month.split('-').map(Number);
+  const result: string[] = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(Date.UTC(y, mo - 1 - i, 1));
+    result.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`);
+  }
+  return result;
 }
 
 export function AccountingSummary() {
@@ -24,7 +42,10 @@ export function AccountingSummary() {
   const [data, setData] = useState<MonthlySummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [breakdown, setBreakdown] = useState<'group' | 'region'>('group');
+  const [breakdown, setBreakdown] = usePersistentState<'group' | 'region'>('accountingSummary.breakdown', 'group');
+
+  const [trend, setTrend] = useState<{ month: string; billed: number; paid: number }[]>([]);
+  const [trendLoading, setTrendLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true); setError(null);
@@ -32,6 +53,19 @@ export function AccountingSummary() {
       .then(setData)
       .catch(() => setError('Failed to load summary'))
       .finally(() => setLoading(false));
+  }, [month]);
+
+  useEffect(() => {
+    const months = lastNMonths(month, 6);
+    Promise.all(months.map((m) => getMonthlySummary(m).catch(() => null)))
+      .then((results) => {
+        setTrend(months.map((m, i) => ({
+          month: m,
+          billed: results[i]?.totalBilled ?? 0,
+          paid: results[i]?.totalPaid ?? 0,
+        })));
+      })
+      .finally(() => setTrendLoading(false));
   }, [month]);
 
   return (
@@ -58,16 +92,16 @@ export function AccountingSummary() {
           <div className={styles.kpiStrip}>
             <div className={styles.kpiCard}>
               <p className={styles.kpiLabel}>Total Billed</p>
-              <p className={`${styles.kpiValue} ${styles.kpiBlue}`}>${data.totalBilled.toFixed(2)}</p>
+              <p className={`${styles.kpiValue} ${styles.kpiBlue}`}>${formatMoney(data.totalBilled)}</p>
             </div>
             <div className={styles.kpiCard}>
               <p className={styles.kpiLabel}>Total Collected</p>
-              <p className={`${styles.kpiValue} ${styles.kpiGreen}`}>${data.totalPaid.toFixed(2)}</p>
+              <p className={`${styles.kpiValue} ${styles.kpiGreen}`}>${formatMoney(data.totalPaid)}</p>
             </div>
             <div className={styles.kpiCard}>
               <p className={styles.kpiLabel}>Outstanding</p>
               <p className={`${styles.kpiValue} ${data.outstanding > 0 ? styles.kpiRed : styles.kpiGreen}`}>
-                ${data.outstanding.toFixed(2)}
+                ${formatMoney(data.outstanding)}
               </p>
             </div>
             <div className={styles.kpiCard}>
@@ -88,15 +122,55 @@ export function AccountingSummary() {
                 <p style={{ margin: 0, fontSize: '0.72rem', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</p>
                 <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'baseline' }}>
                   <span style={{ fontSize: '1.3rem', fontWeight: 700, color }}>{type.customerCount}<span style={{ fontSize: '0.75rem', color: '#6b7280', marginLeft: 4 }}>customers</span></span>
-                  <span style={{ fontSize: '0.85rem', color: '#9ca3af' }}>Billed <strong style={{ color: '#e5e7eb' }}>${type.totalBilled.toFixed(2)}</strong></span>
-                  <span style={{ fontSize: '0.85rem', color: '#9ca3af' }}>Collected <strong style={{ color: '#34d399' }}>${type.totalPaid.toFixed(2)}</strong></span>
-                  <span style={{ fontSize: '0.85rem', color: '#9ca3af' }}>Outstanding <strong style={{ color: type.outstanding > 0.001 ? '#f87171' : '#34d399' }}>${type.outstanding.toFixed(2)}</strong></span>
+                  <span style={{ fontSize: '0.85rem', color: '#9ca3af' }}>Billed <strong style={{ color: '#e5e7eb' }}>${formatMoney(type.totalBilled)}</strong></span>
+                  <span style={{ fontSize: '0.85rem', color: '#9ca3af' }}>Collected <strong style={{ color: '#34d399' }}>${formatMoney(type.totalPaid)}</strong></span>
+                  <span style={{ fontSize: '0.85rem', color: '#9ca3af' }}>Outstanding <strong style={{ color: type.outstanding > 0.001 ? '#f87171' : '#34d399' }}>${formatMoney(type.outstanding)}</strong></span>
                 </div>
               </div>
             ))}
           </div>
 
           <div className={styles.content}>
+            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+              <div className={styles.tableCard} style={{ flex: '2 1 420px' }}>
+                <div className={styles.tableCardHeader}>
+                  <h2 className={styles.tableCardTitle}>Billed vs Collected — Last 6 Months</h2>
+                </div>
+                <div style={{ padding: '16px 20px' }}>
+                  {trendLoading ? (
+                    <p style={{ color: 'var(--tx-4)', textAlign: 'center', padding: '40px 0' }}>Loading…</p>
+                  ) : (
+                    <SimpleLineChart
+                      series={[
+                        { name: 'Billed', color: '#60a5fa', points: trend.map((t) => ({ x: fmtMonthShort(t.month), y: t.billed })) },
+                        { name: 'Collected', color: '#34d399', points: trend.map((t) => ({ x: fmtMonthShort(t.month), y: t.paid })) },
+                      ]}
+                      formatValue={(v) => `$${formatMoney(v, 0)}`}
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div className={styles.tableCard} style={{ flex: '1 1 300px' }}>
+                <div className={styles.tableCardHeader}>
+                  <h2 className={styles.tableCardTitle}>Outstanding by Group</h2>
+                </div>
+                <div style={{ padding: '16px 20px' }}>
+                  {data.byGroup.length === 0 ? (
+                    <p style={{ color: 'var(--tx-4)', textAlign: 'center', padding: '40px 0' }}>No billing data for this month.</p>
+                  ) : (
+                    <SimpleBarChart
+                      data={[...data.byGroup]
+                        .sort((a, b) => b.outstanding - a.outstanding)
+                        .slice(0, 8)
+                        .map((g) => ({ name: g.groupName, value: g.outstanding, color: '#f87171' }))}
+                      formatValue={(v) => `$${formatMoney(v, 0)}`}
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+
             <div className={styles.tableCard}>
               <div className={styles.tableCardHeader}>
                 <h2 className={styles.tableCardTitle}>
@@ -146,10 +220,10 @@ export function AccountingSummary() {
                           <td>{g.groupName}</td>
                           <td className={styles.muted}>{g.regionName}</td>
                           <td className={styles.right}>{g.customerCount}</td>
-                          <td className={`${styles.right} ${styles.kpiBlue}`}>${g.totalBilled.toFixed(2)}</td>
-                          <td className={`${styles.right} ${styles.green}`}>${g.totalPaid.toFixed(2)}</td>
+                          <td className={`${styles.right} ${styles.kpiBlue}`}>${formatMoney(g.totalBilled)}</td>
+                          <td className={`${styles.right} ${styles.green}`}>${formatMoney(g.totalPaid)}</td>
                           <td className={`${styles.right} ${g.outstanding > 0.001 ? styles.red : styles.muted}`}>
-                            ${g.outstanding.toFixed(2)}
+                            ${formatMoney(g.outstanding)}
                           </td>
                           <td className="right">
                             <div className={styles.rateWrap}>
@@ -185,10 +259,10 @@ export function AccountingSummary() {
                         <tr key={r.regionId}>
                           <td>{r.regionName}</td>
                           <td className={styles.right}>{r.customerCount}</td>
-                          <td className={`${styles.right} ${styles.kpiBlue}`}>${r.totalBilled.toFixed(2)}</td>
-                          <td className={`${styles.right} ${styles.green}`}>${r.totalPaid.toFixed(2)}</td>
+                          <td className={`${styles.right} ${styles.kpiBlue}`}>${formatMoney(r.totalBilled)}</td>
+                          <td className={`${styles.right} ${styles.green}`}>${formatMoney(r.totalPaid)}</td>
                           <td className={`${styles.right} ${r.outstanding > 0.001 ? styles.red : styles.muted}`}>
-                            ${r.outstanding.toFixed(2)}
+                            ${formatMoney(r.outstanding)}
                           </td>
                           <td className="right">
                             <div className={styles.rateWrap}>

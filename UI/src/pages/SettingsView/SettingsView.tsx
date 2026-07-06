@@ -13,6 +13,7 @@ import {
   createGenerator, updateGenerator, deleteGenerator,
 } from '../../api/generator/generator.api';
 import { useRegionsContext } from '../../context/RegionsContext';
+import { formatMoney } from '../../utils/format';
 import styles from './SettingsView.module.css';
 
 /* ─────────────────────────────────────────────────
@@ -155,14 +156,14 @@ function BillingPanel({ group, isCounter, externalKey = 0 }: BillingPanelProps) 
             {entries.map((e) => (
               <tr key={e.id}>
                 <td>{formatMonth(e.date)}</td>
-                <td className={styles.priceCell}>${e.price.toFixed(3)}</td>
+                <td className={styles.priceCell}>${formatMoney(e.price, 3)}</td>
                 <td>
                   <span className={styles.billCount}>{e.billsCreated}</span>
                 </td>
                 <td className={styles.formulaCell}>
                   {isCounter
-                    ? <span>(Counter<sub>cur</sub> − Counter<sub>prev</sub>) × ${e.price.toFixed(3)} + fee</span>
-                    : <span>Ampere × ${e.price.toFixed(3)}</span>}
+                    ? <span>(Counter<sub>cur</sub> − Counter<sub>prev</sub>) × ${formatMoney(e.price, 3)} + fee</span>
+                    : <span>Ampere × ${formatMoney(e.price, 3)}</span>}
                 </td>
               </tr>
             ))}

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { getGroupSummaries, type GroupOverviewDto } from '../../api/generator/generator.api';
 import { SimpleBarChart } from '../../app/components/SimpleBarChart';
+import { formatMoney } from '../../utils/format';
 import styles from './Overview.module.css';
 
 const COLORS = ['#facc15', '#38bdf8', '#a78bfa', '#fb923c', '#34d399', '#f472b6'];
@@ -74,7 +75,7 @@ export function Overview() {
             <StatCard
               icon={<DollarSign size={20} color="#34d399" />}
               label="Total Revenue"
-              value={`$${totalRevenue.toFixed(2)}`}
+              value={`$${formatMoney(totalRevenue)}`}
               sub="Total collected"
               cardClass={styles.statCardEmerald}
             />
@@ -109,7 +110,7 @@ export function Overview() {
               <SimpleBarChart
                 data={revenueChartData}
                 height={200}
-                formatValue={(v) => `$${v.toFixed(2)}`}
+                formatValue={(v) => `$${formatMoney(v)}`}
               />
             </div>
           </div>
@@ -168,7 +169,7 @@ export function Overview() {
                       </td>
 
                       <td className={`${styles.td} ${styles.tdRight} ${styles.tdEmerald}`}>
-                        ${g.totalRevenue.toFixed(2)}
+                        ${formatMoney(g.totalRevenue)}
                       </td>
 
                       <td className={`${styles.td} ${styles.tdCenter}`}>

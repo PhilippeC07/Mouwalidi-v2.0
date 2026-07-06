@@ -38,6 +38,33 @@
 }
 .backBtn:hover { color: var(--tx-1); }
 
+.headerActionBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+}
+.headerActionBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.addBillBtn {
+  background-color: rgba(52, 211, 153, 0.1);
+  color: #34d399;
+  border: 1px solid rgba(52, 211, 153, 0.3);
+}
+.addBillBtn:hover { background-color: rgba(52, 211, 153, 0.2); }
+
+.printBtn {
+  background-color: rgba(96, 165, 250, 0.1);
+  color: #60a5fa;
+  border: 1px solid rgba(96, 165, 250, 0.3);
+}
+.printBtn:hover { background-color: rgba(96, 165, 250, 0.2); }
+
 .headerBody { display: flex; align-items: center; gap: 16px; }
 
 .avatar {
@@ -142,11 +169,22 @@
 .empty { color: var(--tx-4); font-size: 0.875rem; text-align: center; padding: 40px 0; }
 
 /* ── Table ── */
-.tableWrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--br); }
+.tableWrap {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 65vh;
+  border-radius: 8px;
+  border: 1px solid var(--br);
+  scrollbar-width: none;
+}
+.tableWrap::-webkit-scrollbar { display: none; }
 
 .table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
 
 .table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   text-align: left;
   padding: 10px 12px;
   background: var(--bg-3);
@@ -184,6 +222,7 @@
 .usageZero     { color: var(--tx-5); }
 
 .balanceVal      { color: var(--tx-1); font-weight: 600; }
+.balanceOverridden { border-color: rgba(167, 139, 250, 0.4) !important; background: rgba(167, 139, 250, 0.08) !important; color: #a78bfa !important; }
 .paidVal         { color: #34d399; }
 .remainingDue    { color: #f87171; font-weight: 600; }
 .remainingClear  { color: var(--tx-5); }
@@ -220,6 +259,27 @@
 
 .summaryCardDue   { background: rgba(248, 113, 113, 0.06); }
 .summaryCardClear { background: rgba(52, 211, 153, 0.05); }
+
+.chartsRow {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.chartCard {
+  flex: 1 1 320px;
+  background: var(--bg-0);
+  border: 1px solid var(--br);
+  border-radius: 8px;
+  padding: 14px 18px 6px;
+}
+
+.chartCardTitle {
+  color: var(--tx-1);
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
 
 .summaryLabel {
   color: var(--tx-4);
@@ -276,20 +336,38 @@
 .cellInput:hover  { border-color: var(--bg-4); background: var(--bg-2); }
 .cellInput:focus  { border-color: #3b82f6; background: var(--bg-2); color: var(--tx-1); }
 
-.cellSelect {
+.dateInput {
   background: transparent;
   border: 1px solid transparent;
   border-radius: 4px;
   color: var(--tx-2);
   font-size: 0.78rem;
-  padding: 3px 4px;
+  padding: 3px 6px;
   outline: none;
-  cursor: pointer;
+  width: 132px;
+  color-scheme: dark;
   transition: border-color 0.15s, background 0.15s;
-  max-width: 110px;
 }
-.cellSelect:hover  { border-color: var(--bg-4); background: var(--bg-2); }
-.cellSelect:focus  { border-color: #3b82f6; background: var(--bg-2); }
-.cellSelect option { background: var(--bg-3); }
+.dateInput:hover { border-color: var(--bg-4); background: var(--bg-2); }
+.dateInput:focus { border-color: #3b82f6; background: var(--bg-2); color: var(--tx-1); }
+
+:global([data-theme="light"]) .dateInput { color-scheme: light; }
+
+/* ── Remaining cell + quick pay action ── */
+.remainingCell { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+
+.markPaidBtn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 9px; border-radius: 999px;
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  background: rgba(52, 211, 153, 0.08);
+  color: #34d399;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.markPaidBtn:hover { background: rgba(52, 211, 153, 0.2); }
 
 .cellCheck { width: 15px; height: 15px; cursor: pointer; accent-color: #3b82f6; }

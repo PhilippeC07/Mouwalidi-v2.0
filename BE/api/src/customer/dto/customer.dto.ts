@@ -60,6 +60,9 @@ export class CreateConsumptionTypeDto {
   @ApiProperty({ example: false })
   ThreePhase!: boolean;
 
+  @ApiPropertyOptional({ description: 'Flat monthly subscription fee, only used for counter (metered) types', example: 0 })
+  monthlyFee?: number;
+
   @ApiProperty({ description: 'UUID of the GeneratorGroup' })
   generatorGroupId!: string;
 }
@@ -69,6 +72,7 @@ export class UpdateConsumptionTypeDto {
   @ApiPropertyOptional() Ampere?: number;
   @ApiPropertyOptional() isCounter?: boolean;
   @ApiPropertyOptional() ThreePhase?: boolean;
+  @ApiPropertyOptional() monthlyFee?: number;
 }
 
 export class UpdateCustomerDto {
@@ -112,6 +116,9 @@ export class ConsumptionTypeResponseDto {
 
   @ApiProperty()
   ThreePhase!: boolean;
+
+  @ApiProperty()
+  monthlyFee!: number;
 }
 
 class CustomerConsumptionStatusDto {
