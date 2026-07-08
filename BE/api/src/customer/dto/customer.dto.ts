@@ -137,6 +137,26 @@ class CustomerConsumptionTypeDto {
   ThreePhase!: boolean;
 }
 
+export class CreateDepositDto {
+  @ApiProperty({ example: 100, description: 'Deposit amount' })
+  amount!: number;
+
+  @ApiPropertyOptional({ example: 0, description: 'Amount already paid at creation time' })
+  paidAmount?: number;
+
+  @ApiProperty({ example: '2025-01', description: 'Month this deposit belongs to, in YYYY-MM format' })
+  month!: string;
+}
+
+export class UpdateDepositDto {
+  @ApiPropertyOptional() amount?: number;
+  @ApiPropertyOptional() paidAmount?: number;
+  @ApiPropertyOptional({ description: 'Date the deposit was paid (ISO date, e.g. 2026-07-05)' })
+  paidDate?: string;
+  @ApiPropertyOptional({ description: 'Month this deposit belongs to, in YYYY-MM format' })
+  month?: string;
+}
+
 export class CustomerListItemDto {
   @ApiProperty()
   id!: string;

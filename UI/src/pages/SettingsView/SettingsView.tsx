@@ -14,7 +14,15 @@ import {
 } from '../../api/generator/generator.api';
 import { useRegionsContext } from '../../context/RegionsContext';
 import { formatMoney } from '../../utils/format';
+import { useReceiptTemplate, type ReceiptTemplateId } from '../../context/ReceiptTemplateContext';
+import { ReceiptTemplatePreview } from '../../components/receipts/ReceiptTemplatePreview';
 import styles from './SettingsView.module.css';
+
+const RECEIPT_TEMPLATE_OPTIONS: { id: ReceiptTemplateId; name: string; description: string }[] = [
+  { id: 'classic', name: 'Classic', description: 'The original boxed-field layout (default).' },
+  { id: 'modern', name: 'Modern', description: 'Bordered card with a highlighted balance bar.' },
+  { id: 'compact', name: 'Compact', description: 'Condensed single-line fields, no boxes.' },
+];
 
 /* ─────────────────────────────────────────────────
    BillingPanel — one panel per group × isCounter
@@ -860,13 +868,69 @@ function ManageGenerators({ onRefetch }: { onRefetch: () => void }) {
 }
 
 /* ─────────────────────────────────────────────────
+   Receipt company info — editable title + phone numbers
+───────────────────────────────────────────────── */
+function ReceiptCompanyInfoCard() {
+  const { companyInfo, setCompanyInfo } = useReceiptTemplate();
+  const [name, setName] = useState(companyInfo.name);
+  const [phone, setPhone] = useState(companyInfo.phone);
+  const [maintenancePhone, setMaintenancePhone] = useState(companyInfo.maintenancePhone);
+  const [saved, setSaved] = useState(false);
+
+  const dirty = name !== companyInfo.name || phone !== companyInfo.phone || maintenancePhone !== companyInfo.maintenancePhone;
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setCompanyInfo({ name: name.trim(), phone: phone.trim(), maintenancePhone: maintenancePhone.trim() });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
+  }
+
+  return (
+    <div className={styles.infraCard} style={{ maxWidth: 420 }}>
+      <div className={styles.infraCardHeader}>
+        <Pencil size={14} className={styles.infraIcon} style={{ color: '#60a5fa' }} />
+        <span className={styles.infraCardTitle}>Receipt Header</span>
+      </div>
+      <form onSubmit={handleSubmit} className={styles.infraForm}>
+        <div className={styles.infraField}>
+          <label className={styles.infraLabel}>Company Name</label>
+          <input
+            className={styles.infraInput}
+            value={name}
+            onChange={e => setName(e.target.value)}
+            dir="rtl"
+            required
+          />
+        </div>
+        <div className={styles.infraRow}>
+          <div className={styles.infraField}>
+            <label className={styles.infraLabel}>Phone</label>
+            <input className={styles.infraInput} value={phone} onChange={e => setPhone(e.target.value)} required />
+          </div>
+          <div className={styles.infraField}>
+            <label className={styles.infraLabel}>Maintenance Phone</label>
+            <input className={styles.infraInput} value={maintenancePhone} onChange={e => setMaintenancePhone(e.target.value)} required />
+          </div>
+        </div>
+        {saved && <div className={styles.infraSuccess}><CheckCircle size={13} /> Saved.</div>}
+        <button className={styles.infraBtn} disabled={!dirty || !name.trim() || !phone.trim() || !maintenancePhone.trim()}>
+          <CheckCircle size={13} /> Save
+        </button>
+      </form>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────
    SettingsView — main page
 ───────────────────────────────────────────────── */
 export function SettingsView() {
   const { data: regions, loading, error, refetch: refetchRegions } = useRegions();
   const [collapsedRegions, setCollapsedRegions] = useState<Set<string>>(new Set());
   const [regionKeys, setRegionKeys] = useState<Record<string, number>>({});
-  const [activeTab, setActiveTab] = useState<'infrastructure' | 'billing'>('infrastructure');
+  const [activeTab, setActiveTab] = useState<'infrastructure' | 'billing' | 'receipts'>('infrastructure');
+  const { template: selectedReceiptTemplate, setTemplate: setSelectedReceiptTemplate } = useReceiptTemplate();
 
   function toggleRegion(id: string) {
     setCollapsedRegions((prev) => {
@@ -899,6 +963,12 @@ export function SettingsView() {
           onClick={() => setActiveTab('billing')}
         >
           Monthly Billing
+        </button>
+        <button
+          className={`${styles.tabBtn} ${activeTab === 'receipts' ? styles.tabBtnActive : ''}`}
+          onClick={() => setActiveTab('receipts')}
+        >
+          Receipts
         </button>
       </div>
 
@@ -988,6 +1058,53 @@ export function SettingsView() {
                 </div>
               );
             })}
+          </section>
+        )}
+
+        {activeTab === 'receipts' && (
+          <section className={styles.section}>
+            <h2 className={styles.sectionTitle}>Receipt Header</h2>
+            <p className={styles.sectionDesc}>
+              The title and phone numbers printed at the top of every receipt.
+            </p>
+            <ReceiptCompanyInfoCard />
+
+            <h2 className={styles.sectionTitle} style={{ marginTop: '28px' }}>Receipt Template</h2>
+            <p className={styles.sectionDesc}>
+              Choose the layout used for printed customer receipts. All templates are sized for a DL
+              envelope (220 × 110mm) and printed in Arabic — this only changes the look, not the data.
+            </p>
+
+            <div className={styles.receiptSelectedPreview}>
+              <ReceiptTemplatePreview template={selectedReceiptTemplate} scale={0.62} />
+              <div className={styles.receiptSelectedPreviewLabel}>
+                Currently selected: <strong>{RECEIPT_TEMPLATE_OPTIONS.find(o => o.id === selectedReceiptTemplate)?.name}</strong>
+              </div>
+            </div>
+
+            <div className={styles.receiptTemplateGrid}>
+              {RECEIPT_TEMPLATE_OPTIONS.map((opt) => {
+                const active = selectedReceiptTemplate === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    className={`${styles.receiptTemplateCard} ${active ? styles.receiptTemplateCardActive : ''}`}
+                    onClick={() => setSelectedReceiptTemplate(opt.id)}
+                  >
+                    <ReceiptTemplatePreview template={opt.id} />
+                    <div className={styles.receiptTemplateInfo}>
+                      <div className={styles.receiptTemplateNameRow}>
+                        <span className={styles.receiptTemplateName}>{opt.name}</span>
+                        {opt.id === 'classic' && <span className={styles.receiptTemplateDefault}>Default</span>}
+                        {active && <CheckCircle size={15} className={styles.receiptTemplateCheck} />}
+                      </div>
+                      <p className={styles.receiptTemplateDesc}>{opt.description}</p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </section>
         )}
       </div>

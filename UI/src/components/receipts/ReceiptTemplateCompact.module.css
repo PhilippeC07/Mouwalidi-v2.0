@@ -1,0 +1,146 @@
+.printRoot {
+  display: none;
+}
+
+.previewRoot {
+  display: block;
+}
+
+@media print {
+  @page receipt {
+    size: 220mm 110mm;
+    margin: 0;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .printRoot,
+  .printRoot * {
+    visibility: visible;
+  }
+
+  .printRoot {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+}
+
+.page {
+  page: receipt;
+  width: 220mm;
+  height: 110mm;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  direction: rtl;
+  page-break-after: always;
+  font-family: Tahoma, 'Noto Naskh Arabic', Arial, sans-serif;
+  color: #000;
+  background: #fff;
+  overflow: hidden;
+}
+
+.page:last-child {
+  page-break-after: auto;
+}
+
+.stub {
+  flex: 1 1 0;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 2.5mm 4.5mm;
+  display: flex;
+  flex-direction: column;
+  gap: 1mm;
+}
+
+.headerZone {
+  min-height: 9mm;
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-end;
+}
+
+.companyHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3mm;
+}
+
+.companyName {
+  font-size: 4.2mm;
+  font-weight: 700;
+}
+
+.companyPhones {
+  font-size: 2.6mm;
+  color: #333;
+}
+
+.lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5mm;
+  font-size: 3.1mm;
+  line-height: 1.3;
+}
+
+.line b {
+  font-weight: 700;
+}
+
+.balanceLine {
+  margin-top: auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-top: 0.3mm solid #000;
+  padding-top: 1mm;
+}
+
+.balanceLabel {
+  font-size: 3.4mm;
+  font-weight: 700;
+}
+
+.balanceValue {
+  direction: ltr;
+  font-size: 4.4mm;
+  font-weight: 700;
+}
+
+.middleStub {
+  flex: 0 0 16mm;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5mm;
+  padding: 2mm 0.5mm;
+  text-align: center;
+  border-right: 0.2mm dashed #999;
+  border-left: 0.2mm dashed #999;
+}
+
+.monthTag {
+  margin: 0;
+  font-size: 3.6mm;
+  font-weight: 700;
+}
+
+.monthValue {
+  text-decoration: underline;
+  text-underline-offset: 1.5px;
+}
+
+.buildingTag {
+  margin: 0;
+  font-size: 2.8mm;
+  color: #333;
+}

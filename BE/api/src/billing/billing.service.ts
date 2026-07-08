@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service.js';
-import { CounterUpdateItemDto, CreateMonthlyBillingDto, CreateSingleBillingDto, CustomerBalanceDto, CustomerTypeSummaryDto, MonthlyCounterEntryDto, MonthlyCustomerEntryDto, MonthlySummaryDto, ReceiptDto, RegionSummaryLineDto, UpdateMonthlyConsumptionDto } from './dto/billing.dto.js';
+import { CounterUpdateItemDto, CreateMonthlyBillingDto, CreateSingleBillingDto, CustomerAllTimeBalanceDto, CustomerBalanceDto, CustomerTypeSummaryDto, MonthlyCounterEntryDto, MonthlyCustomerEntryDto, MonthlySummaryDto, ReceiptDto, RegionSummaryLineDto, UpdateMonthlyConsumptionDto } from './dto/billing.dto.js';
 
 @Injectable()
 export class BillingService {
@@ -430,6 +430,69 @@ export class BillingService {
         closedBalance: c.closedBalance,
       };
     });
+  }
+
+  /**
+   * Each customer's total unpaid amount across ALL their bills and deposits —
+   * not scoped to a single month. Used for group-level "Outstanding" /
+   * "Remaining" / payment-alert KPIs, which would otherwise go blank for any
+   * month that group hasn't been billed for yet even though customers may
+   * still owe money from other months.
+   */
+  async getGroupCustomerAllTimeBalances(generatorGroupId: string): Promise<CustomerAllTimeBalanceDto[]> {
+    const [consumptions, deposits] = await Promise.all([
+      this.db.monthlyConsumption.findMany({
+        where: { customer: { consumptionType: { generatorGroupId } } },
+        select: {
+          customerId: true,
+          previousCounter: true,
+          currentCounter: true,
+          monthlyFee: true,
+          balanceOverride: true,
+          amountPaid: true,
+          kwhPrice: true,
+          closedBalance: true,
+          customer: { select: { isCounter: true } },
+        },
+      }),
+      this.db.deposit.findMany({
+        where: { customer: { consumptionType: { generatorGroupId } } },
+        select: { customerId: true, amount: true, paidAmount: true },
+      }),
+    ]);
+
+    // Every customer with at least one bill or deposit gets an entry — even
+    // if it sums to exactly 0 — so a fully-paid-up customer renders as a
+    // clear "$0.00" rather than a "no data" dash, which is reserved for
+    // customers who have never been billed at all.
+    const byCustomer = new Map<string, number>();
+
+    for (const c of consumptions) {
+      if (!byCustomer.has(c.customerId)) byCustomer.set(c.customerId, 0);
+      if (c.closedBalance) continue;
+      const balance = this.calcBalance({
+        isCounter: c.customer.isCounter,
+        previousCounter: c.previousCounter,
+        currentCounter: c.currentCounter,
+        kwhPrice: c.kwhPrice,
+        monthlyFee: c.monthlyFee,
+        balanceOverride: c.balanceOverride,
+      });
+      const remaining = balance - c.amountPaid;
+      if (remaining > 0.001) {
+        byCustomer.set(c.customerId, byCustomer.get(c.customerId)! + remaining);
+      }
+    }
+
+    for (const d of deposits) {
+      if (!byCustomer.has(d.customerId)) byCustomer.set(d.customerId, 0);
+      const remaining = d.amount - d.paidAmount;
+      if (remaining > 0.001) {
+        byCustomer.set(d.customerId, byCustomer.get(d.customerId)! + remaining);
+      }
+    }
+
+    return Array.from(byCustomer.entries()).map(([customerId, remaining]) => ({ customerId, remaining }));
   }
 
   async getMonthlyCounterEntries(month: string, generatorGroupId: string): Promise<MonthlyCounterEntryDto[]> {

@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBody, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { BillingService } from './billing.service.js';
-import { BulkUpdateCountersDto, CreateMonthlyBillingDto, CreateSingleBillingDto, CustomerBalanceDto, GetReceiptsDto, MonthlyCounterEntryDto, MonthlyCustomerEntryDto, MonthlySummaryDto, ReceiptDto, UpdateMonthlyConsumptionDto } from './dto/billing.dto.js';
+import { BulkUpdateCountersDto, CreateMonthlyBillingDto, CreateSingleBillingDto, CustomerAllTimeBalanceDto, CustomerBalanceDto, GetReceiptsDto, MonthlyCounterEntryDto, MonthlyCustomerEntryDto, MonthlySummaryDto, ReceiptDto, UpdateMonthlyConsumptionDto } from './dto/billing.dto.js';
 
 @ApiTags('Billing')
 @Controller('billing')
@@ -35,6 +35,14 @@ export class BillingController {
     @Query('generatorGroupId') generatorGroupId: string,
   ): Promise<CustomerBalanceDto[]> {
     return this.billingService.getMonthlyCustomerBalances(month, generatorGroupId);
+  }
+
+  @Get('monthly/balances/all-time')
+  @ApiQuery({ name: 'generatorGroupId', required: true })
+  getGroupCustomerAllTimeBalances(
+    @Query('generatorGroupId') generatorGroupId: string,
+  ): Promise<CustomerAllTimeBalanceDto[]> {
+    return this.billingService.getGroupCustomerAllTimeBalances(generatorGroupId);
   }
 
   @Get('monthly/counters')

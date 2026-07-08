@@ -5,8 +5,10 @@ import {
   ConsumptionTypeResponseDto,
   CreateConsumptionTypeDto,
   CreateCustomerDto,
+  CreateDepositDto,
   UpdateConsumptionTypeDto,
   UpdateCustomerDto,
+  UpdateDepositDto,
 } from './dto/customer.dto.js';
 
 @Injectable()
@@ -60,6 +62,7 @@ export class CustomerService {
   async deleteCustomer(id: string) {
     return this.db.$transaction(async (tx) => {
       await tx.monthlyConsumption.deleteMany({ where: { customerId: id } });
+      await tx.deposit.deleteMany({ where: { customerId: id } });
       await tx.buildingFloor.deleteMany({ where: { customerId: id } });
       return tx.customer.delete({ where: { id } });
     });
@@ -124,8 +127,49 @@ export class CustomerService {
           },
           orderBy: { date: 'desc' },
         },
+        deposits: {
+          select: { id: true, amount: true, paidAmount: true, paidDate: true, date: true },
+          orderBy: { date: 'desc' },
+        },
       },
     });
+  }
+
+  async createDeposit(customerId: string, dto: CreateDepositDto) {
+    const paidAmount = dto.paidAmount ?? 0;
+    return this.db.deposit.create({
+      data: {
+        customerId,
+        amount: dto.amount,
+        paidAmount,
+        paidDate: paidAmount > 0 ? new Date() : null,
+        date: new Date(`${dto.month}-01T00:00:00.000Z`),
+      },
+    });
+  }
+
+  async updateDeposit(id: string, dto: UpdateDepositDto) {
+    const { paidDate, month, ...rest } = dto;
+
+    let paidDateValue: Date | null | undefined;
+    if (paidDate !== undefined) {
+      paidDateValue = paidDate ? new Date(paidDate) : null;
+    } else if (dto.paidAmount !== undefined) {
+      paidDateValue = dto.paidAmount > 0 ? new Date() : null;
+    }
+
+    return this.db.deposit.update({
+      where: { id },
+      data: {
+        ...rest,
+        ...(paidDateValue !== undefined ? { paidDate: paidDateValue } : {}),
+        ...(month !== undefined ? { date: new Date(`${month}-01T00:00:00.000Z`) } : {}),
+      },
+    });
+  }
+
+  async deleteDeposit(id: string) {
+    return this.db.deposit.delete({ where: { id } });
   }
 
   async getCustomersByGroup(generatorGroupId: string) {

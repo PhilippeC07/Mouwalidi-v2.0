@@ -2,6 +2,10 @@
   display: none;
 }
 
+.previewRoot {
+  display: block;
+}
+
 @media print {
   @page receipt {
     size: 220mm 110mm;

@@ -65,6 +65,13 @@
 }
 .printBtn:hover { background-color: rgba(96, 165, 250, 0.2); }
 
+.addDepositBtn {
+  background-color: rgba(167, 139, 250, 0.1);
+  color: #a78bfa;
+  border: 1px solid rgba(167, 139, 250, 0.3);
+}
+.addDepositBtn:hover { background-color: rgba(167, 139, 250, 0.2); }
+
 .headerBody { display: flex; align-items: center; gap: 16px; }
 
 .avatar {
@@ -179,25 +186,25 @@
 }
 .tableWrap::-webkit-scrollbar { display: none; }
 
-.table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
 
 .table th {
   position: sticky;
   top: 0;
   z-index: 2;
   text-align: left;
-  padding: 10px 12px;
+  padding: 7px 8px;
   background: var(--bg-3);
   color: var(--tx-4);
   font-weight: 500;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   white-space: nowrap;
 }
 
 .table td {
-  padding: 10px 12px;
+  padding: 7px 8px;
   border-top: 1px solid var(--br);
   color: var(--tx-2);
   white-space: nowrap;
@@ -205,10 +212,40 @@
 
 .rowPaid   td { background: var(--bg-0); }
 .rowUnpaid td { background: var(--bg-0); }
+.rowDeposit td { background: rgba(167, 139, 250, 0.06); }
 .table tbody tr:hover td { background: var(--bg-2) !important; }
 
+.depositMonthCell { display: flex; align-items: center; gap: 6px; }
+
+.depositTag {
+  display: inline-block;
+  font-size: 0.64rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(167, 139, 250, 0.15);
+  color: #a78bfa;
+  flex-shrink: 0;
+}
+
+.deleteDepositBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--tx-4);
+  cursor: pointer;
+  padding: 3px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+.deleteDepositBtn:hover { color: #f87171; background: rgba(248, 113, 113, 0.1); }
+
 /* ── Cell variants ── */
-.monthCell  { color: var(--tx-3) !important; font-size: 0.8rem; }
+.monthCell  { color: var(--tx-3) !important; font-size: 0.76rem; }
 .numCell    { font-variant-numeric: tabular-nums; text-align: right; }
 .iconCell   { text-align: center; }
 
@@ -241,17 +278,16 @@
 /* ── Billing summary strip ── */
 .summaryStrip {
   display: flex;
-  gap: 1px;
-  background: var(--br);
-  border: 1px solid var(--br);
-  border-radius: 8px;
-  overflow: hidden;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .summaryCard {
-  flex: 1;
+  flex: 0 0 220px;
   padding: 12px 18px;
   background: var(--bg-0);
+  border: 1px solid var(--br);
+  border-radius: 8px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -259,6 +295,37 @@
 
 .summaryCardDue   { background: rgba(248, 113, 113, 0.06); }
 .summaryCardClear { background: rgba(52, 211, 153, 0.05); }
+
+.notesCard {
+  flex: 1 1 260px;
+  padding: 12px 18px;
+  background: var(--bg-0);
+  border: 1px solid var(--br);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.notesTextarea {
+  flex: 1;
+  min-height: 36px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--tx-1);
+  font-family: inherit;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  padding: 4px 6px;
+  margin: -4px -6px;
+  outline: none;
+  resize: vertical;
+  transition: border-color 0.15s, background 0.15s;
+}
+.notesTextarea::placeholder { color: var(--tx-5); }
+.notesTextarea:hover  { border-color: var(--bg-4); background: var(--bg-2); }
+.notesTextarea:focus  { border-color: #3b82f6; background: var(--bg-2); }
 
 .chartsRow {
   display: flex;
@@ -321,12 +388,12 @@
   border: 1px solid transparent;
   border-radius: 4px;
   color: var(--tx-2);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-variant-numeric: tabular-nums;
   text-align: right;
-  padding: 3px 6px;
+  padding: 3px 5px;
   outline: none;
-  width: 84px;
+  width: 66px;
   transition: border-color 0.15s, background 0.15s;
   -moz-appearance: textfield;
 }
@@ -341,10 +408,10 @@
   border: 1px solid transparent;
   border-radius: 4px;
   color: var(--tx-2);
-  font-size: 0.78rem;
-  padding: 3px 6px;
+  font-size: 0.72rem;
+  padding: 3px 4px;
   outline: none;
-  width: 132px;
+  width: 108px;
   color-scheme: dark;
   transition: border-color 0.15s, background 0.15s;
 }
@@ -354,15 +421,15 @@
 :global([data-theme="light"]) .dateInput { color-scheme: light; }
 
 /* ── Remaining cell + quick pay action ── */
-.remainingCell { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.remainingCell { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
 
 .markPaidBtn {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 3px 9px; border-radius: 999px;
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 7px; border-radius: 999px;
   border: 1px solid rgba(52, 211, 153, 0.3);
   background: rgba(52, 211, 153, 0.08);
   color: #34d399;
-  font-size: 0.7rem;
+  font-size: 0.66rem;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;

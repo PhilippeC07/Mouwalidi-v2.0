@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBody, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { CustomerService } from './customer.service.js';
-import { CreateConsumptionTypeDto, CreateCustomerDto, UpdateConsumptionTypeDto, UpdateCustomerDto } from './dto/customer.dto.js';
+import { CreateConsumptionTypeDto, CreateCustomerDto, CreateDepositDto, UpdateConsumptionTypeDto, UpdateCustomerDto, UpdateDepositDto } from './dto/customer.dto.js';
 
 @ApiTags('Customer')
 @Controller('customer')
@@ -40,6 +40,23 @@ export class CustomerController {
   @Delete('consumption-types/:id')
   deleteConsumptionType(@Param('id') id: string) {
     return this.customerService.deleteConsumptionType(id);
+  }
+
+  @Post(':customerId/deposits')
+  @ApiBody({ type: CreateDepositDto })
+  createDeposit(@Param('customerId') customerId: string, @Body() body: CreateDepositDto) {
+    return this.customerService.createDeposit(customerId, body);
+  }
+
+  @Patch('deposits/:id')
+  @ApiBody({ type: UpdateDepositDto })
+  updateDeposit(@Param('id') id: string, @Body() body: UpdateDepositDto) {
+    return this.customerService.updateDeposit(id, body);
+  }
+
+  @Delete('deposits/:id')
+  deleteDeposit(@Param('id') id: string) {
+    return this.customerService.deleteDeposit(id);
   }
 
   @Get(':id')

@@ -93,6 +93,17 @@ model Customer {
   consumptionTypeId   String               @db.Uuid
   consumptionType     ConsumptionType      @relation(fields: [consumptionTypeId], references: [id])
   buildingFloor       BuildingFloor?
+  deposits            Deposit[]
+}
+
+model Deposit {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customerId String    @db.Uuid
+  customer   Customer  @relation(fields: [customerId], references: [id])
+  amount     Float
+  paidAmount Float     @default(0)
+  paidDate   DateTime?
+  date       DateTime  @default(now())
 }
 
 model MonthlyConsumption {

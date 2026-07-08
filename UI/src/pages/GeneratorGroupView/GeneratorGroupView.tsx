@@ -27,7 +27,7 @@ import { useRegions } from '../../hooks/useGetRegions';
 import { useConsumptionLookups } from '../../hooks/useConsumptionLookups';
 import { useCustomers } from '../../hooks/useCustomers';
 import { useBuildings } from '../../hooks/useBuildings';
-import { useCustomerBalances } from '../../hooks/useCustomerBalances';
+import { useGroupAllTimeBalances } from '../../hooks/useGroupAllTimeBalances';
 import { usePersistentState } from '../../hooks/usePersistentState';
 import { createCustomer, updateCustomer, createConsumptionType, type CustomerListItem, type ConsumptionTypeDto } from '../../api/customer/customer.api';
 import { createBuilding } from '../../api/building/building.api';
@@ -107,7 +107,10 @@ export function GeneratorGroupView() {
   const [typeError, setTypeError] = useState<string | null>(null);
 
   const currentMonth = useMemo(() => new Date().toISOString().slice(0, 7), []);
-  const { data: balances } = useCustomerBalances(groupId, currentMonth);
+  // All-time (not month-scoped) so Outstanding/Remaining/Alerts don't go
+  // blank for a group that simply hasn't been billed yet for the current
+  // calendar month — it reflects everything still unpaid across all months.
+  const { data: balances } = useGroupAllTimeBalances(groupId);
 
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [buildingSearch, setBuildingSearch] = usePersistentState('generatorGroupView.buildingSearch', '');
@@ -186,12 +189,6 @@ export function GeneratorGroupView() {
   // group-level stats, so summing them multiplied the count by gen count).
   const totalClients = customers.length;
   const totalLoad = customers.reduce((sum, c) => sum + c.consumptionType.Ampere, 0);
-  const overdueCount = customers.filter(
-    (c) => c.consumptionStatus.Status.toLowerCase() === 'overdue',
-  ).length;
-  const unpaidCount = customers.filter(
-    (c) => c.consumptionStatus.Status.toLowerCase() === 'unpaid',
-  ).length;
   const totalKva = groupGenerators.reduce((sum, g) => sum + g.kvaCapacity, 0);
 
   const hasOffline = groupGenerators.some((g) => g.status === 'offline');
@@ -220,7 +217,6 @@ export function GeneratorGroupView() {
         ? styles.loadBarAmber
         : styles.loadBarGreen;
 
-  const paidCount = totalClients - overdueCount - unpaidCount;
   const genStatusStyle = getGeneratorStatusStyle(groupStatus);
 
   const buildingNameById = new Map(buildings.map((b) => [b.id, b.name]));
@@ -233,6 +229,18 @@ export function GeneratorGroupView() {
   function remainingOf(c: CustomerListItem): number | null {
     return balanceByCustomerId.get(c.id)?.remaining ?? null;
   }
+
+  // Gated by the actual all-time remaining balance rather than trusting the
+  // stored consumptionStatus label alone, which can drift out of sync with
+  // what's really owed (e.g. reads "overdue" for someone who has since paid
+  // off, or misses someone who owes money but was never flagged).
+  const overdueCount = customers.filter(
+    (c) => (remainingOf(c) ?? 0) > 0.001 && c.consumptionStatus.Status.toLowerCase() === 'overdue',
+  ).length;
+  const unpaidCount = customers.filter(
+    (c) => (remainingOf(c) ?? 0) > 0.001 && c.consumptionStatus.Status.toLowerCase() !== 'overdue',
+  ).length;
+  const paidCount = totalClients - overdueCount - unpaidCount;
 
   function renderRemaining(c: CustomerListItem) {
     const remaining = remainingOf(c);

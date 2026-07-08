@@ -202,6 +202,21 @@ export const getMonthlyCustomerBalances = async (
   return data;
 };
 
+export interface CustomerAllTimeBalance {
+  customerId: string;
+  remaining: number;
+}
+
+/** Each customer's total unpaid amount across ALL their bills and deposits — not scoped to one month. */
+export const getGroupCustomerAllTimeBalances = async (
+  generatorGroupId: string,
+): Promise<CustomerAllTimeBalance[]> => {
+  const { data } = await api.get<CustomerAllTimeBalance[]>('/billing/monthly/balances/all-time', {
+    params: { generatorGroupId },
+  });
+  return data;
+};
+
 export interface ReceiptData {
   consumptionId: string;
   customerId: string;

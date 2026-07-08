@@ -78,6 +78,12 @@ export class CustomerBalanceDto {
   @ApiProperty() closedBalance!: boolean;
 }
 
+export class CustomerAllTimeBalanceDto {
+  @ApiProperty() customerId!: string;
+  @ApiProperty({ description: 'Total unpaid amount across every bill and deposit for this customer' })
+  remaining!: number;
+}
+
 export class MonthlyCounterEntryDto {
   @ApiProperty() consumptionId!: string;
   @ApiProperty() customerId!: string;

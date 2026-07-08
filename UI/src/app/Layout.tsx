@@ -4,6 +4,7 @@ import { Menu } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { RegionsProvider } from '../context/RegionsContext';
 import { ThemeProvider } from '../context/ThemeContext';
+import { ReceiptTemplateProvider } from '../context/ReceiptTemplateContext';
 import styles from './app.module.scss';
 
 export function Layout() {
@@ -11,6 +12,7 @@ export function Layout() {
 
   return (
     <ThemeProvider>
+    <ReceiptTemplateProvider>
     <RegionsProvider>
     <div className={styles.root}>
       {sidebarOpen && (
@@ -40,6 +42,7 @@ export function Layout() {
       </div>
     </div>
     </RegionsProvider>
+    </ReceiptTemplateProvider>
     </ThemeProvider>
   );
 }

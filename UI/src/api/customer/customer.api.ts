@@ -143,6 +143,14 @@ export interface MonthlyConsumptionRecord {
   consumptionStatus: { Status: string };
 }
 
+export interface DepositRecord {
+  id: string;
+  amount: number;
+  paidAmount: number;
+  paidDate: string | null;
+  date: string;
+}
+
 export interface CustomerDetail {
   id: string;
   firstName: string;
@@ -160,9 +168,37 @@ export interface CustomerDetail {
     building: { name: string };
   } | null;
   monthlyConsumptions: MonthlyConsumptionRecord[];
+  deposits: DepositRecord[];
 }
 
 export const getCustomerDetails = async (id: string): Promise<CustomerDetail> => {
   const { data } = await api.get<CustomerDetail>(`/customer/${id}`);
   return data;
+};
+
+export interface CreateDepositPayload {
+  amount: number;
+  paidAmount?: number;
+  month: string;
+}
+
+export interface UpdateDepositPayload {
+  amount?: number;
+  paidAmount?: number;
+  paidDate?: string | null;
+  month?: string;
+}
+
+export const createDeposit = async (customerId: string, payload: CreateDepositPayload): Promise<DepositRecord> => {
+  const { data } = await api.post<DepositRecord>(`/customer/${customerId}/deposits`, payload);
+  return data;
+};
+
+export const updateDeposit = async (id: string, payload: UpdateDepositPayload): Promise<DepositRecord> => {
+  const { data } = await api.patch<DepositRecord>(`/customer/deposits/${id}`, payload);
+  return data;
+};
+
+export const deleteDeposit = async (id: string) => {
+  await api.delete(`/customer/deposits/${id}`);
 };
