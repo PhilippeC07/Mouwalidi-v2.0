@@ -1,14 +1,28 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service.js';
-import { GeneratorsResponseDto, GroupOverviewDto, RegionResponseDto } from './dto/region.dto.js';
+import { WhatsappService } from '../whatsapp/whatsapp.service.js';
+import { GeneratorsResponseDto, GroupOverviewDto, RegionResponseDto, RegionWhatsappResultDto } from './dto/region.dto.js';
 import { mapGeneratorsToDto } from './helpers/mappers.js';
+import {
+  assertGeneratorGroupOwned,
+  assertGeneratorOwned,
+  assertRegionOwned,
+  generatorGroupWhere,
+  generatorWhere,
+  regionWhere,
+  type RequestingUser,
+} from '../auth/ownership.util.js';
 
 @Injectable()
 export class GeneratorService {
-  constructor(private readonly db: PrismaService) {}
+  constructor(
+    private readonly db: PrismaService,
+    private readonly whatsapp: WhatsappService,
+  ) {}
 
-  async getAllRegions(): Promise<RegionResponseDto[]> {
+  async getAllRegions(user: RequestingUser): Promise<RegionResponseDto[]> {
     return this.db.region.findMany({
+      where: regionWhere(user),
       select: {
         id: true,
         name: true,
@@ -31,15 +45,18 @@ export class GeneratorService {
     });
   }
 
-  async createRegion(name: string) {
-    return this.db.region.create({ data: { name } });
+  async createRegion(name: string, user: RequestingUser) {
+    return this.db.region.create({ data: { name, ownerId: user.id } });
   }
 
-  async updateRegion(id: string, name: string) {
+  async updateRegion(id: string, name: string, user: RequestingUser) {
+    await assertRegionOwned(this.db, user, id);
     return this.db.region.update({ where: { id }, data: { name } });
   }
 
-  async deleteRegion(id: string) {
+  async deleteRegion(id: string, user: RequestingUser) {
+    await assertRegionOwned(this.db, user, id);
+
     const customerCount = await this.db.customer.count({
       where: { consumptionType: { generatorGroup: { regionId: id } } },
     });
@@ -71,14 +88,45 @@ export class GeneratorService {
     });
   }
 
-  async createGeneratorGroup(name: string, regionId: string) {
+  async sendRegionWhatsappBroadcast(regionId: string, message: string, user: RequestingUser): Promise<RegionWhatsappResultDto> {
+    await assertRegionOwned(this.db, user, regionId);
+
+    const customers = await this.db.customer.findMany({
+      where: { consumptionType: { generatorGroup: { regionId } } },
+      select: { id: true, firstName: true, lastName: true, phoneNumber: true },
+    });
+
+    const withPhone = customers.filter((c) => c.phoneNumber && c.phoneNumber.trim() !== '');
+    const skippedNoPhone = customers.length - withPhone.length;
+
+    let sent = 0;
+    let failed = 0;
+    const errors: { customerId: string; customerName: string; error: string }[] = [];
+
+    for (const c of withPhone) {
+      const result = await this.whatsapp.sendTextMessage(c.phoneNumber!, message);
+      if (result.success) {
+        sent++;
+      } else {
+        failed++;
+        errors.push({ customerId: c.id, customerName: `${c.firstName} ${c.lastName}`, error: result.error ?? 'Unknown error' });
+      }
+    }
+
+    return { totalCustomers: customers.length, sent, failed, skippedNoPhone, errors };
+  }
+
+  async createGeneratorGroup(name: string, regionId: string, user: RequestingUser) {
+    await assertRegionOwned(this.db, user, regionId);
     return this.db.generatorGroup.create({
       data: { name, regionId },
       select: { id: true, name: true, regionId: true },
     });
   }
 
-  async updateGeneratorGroup(id: string, dto: { name?: string; regionId?: string }) {
+  async updateGeneratorGroup(id: string, dto: { name?: string; regionId?: string }, user: RequestingUser) {
+    await assertGeneratorGroupOwned(this.db, user, id);
+    if (dto.regionId) await assertRegionOwned(this.db, user, dto.regionId);
     return this.db.generatorGroup.update({
       where: { id },
       data: dto,
@@ -86,7 +134,9 @@ export class GeneratorService {
     });
   }
 
-  async deleteGeneratorGroup(id: string) {
+  async deleteGeneratorGroup(id: string, user: RequestingUser) {
+    await assertGeneratorGroupOwned(this.db, user, id);
+
     const customerCount = await this.db.customer.count({
       where: { consumptionType: { generatorGroupId: id } },
     });
@@ -108,13 +158,17 @@ export class GeneratorService {
     });
   }
 
-  async createGenerator(dto: {
-    name: string;
-    generatorGroupId: string;
-    kvaCapacity: number;
-    averageDieselConsumption: number;
-    status: string;
-  }) {
+  async createGenerator(
+    dto: {
+      name: string;
+      generatorGroupId: string;
+      kvaCapacity: number;
+      averageDieselConsumption: number;
+      status: string;
+    },
+    user: RequestingUser,
+  ) {
+    await assertGeneratorGroupOwned(this.db, user, dto.generatorGroupId);
     return this.db.generator.create({
       data: dto,
       select: { id: true, name: true },
@@ -124,7 +178,10 @@ export class GeneratorService {
   async updateGenerator(
     id: string,
     dto: { name?: string; generatorGroupId?: string; kvaCapacity?: number; averageDieselConsumption?: number; status?: string },
+    user: RequestingUser,
   ) {
+    await assertGeneratorOwned(this.db, user, id);
+    if (dto.generatorGroupId) await assertGeneratorGroupOwned(this.db, user, dto.generatorGroupId);
     return this.db.generator.update({
       where: { id },
       data: dto,
@@ -132,15 +189,17 @@ export class GeneratorService {
     });
   }
 
-  async deleteGenerator(id: string) {
+  async deleteGenerator(id: string, user: RequestingUser) {
+    await assertGeneratorOwned(this.db, user, id);
     return this.db.$transaction(async (tx) => {
       await tx.maintenanceLog.deleteMany({ where: { generatorId: id } });
       return tx.generator.delete({ where: { id } });
     });
   }
 
-  async getGroupSummaries(): Promise<GroupOverviewDto[]> {
+  async getGroupSummaries(user: RequestingUser): Promise<GroupOverviewDto[]> {
     const groups = await this.db.generatorGroup.findMany({
+      where: generatorGroupWhere(user),
       select: {
         id: true,
         name: true,
@@ -189,8 +248,9 @@ export class GeneratorService {
     });
   }
 
-  async getGenerators(): Promise<GeneratorsResponseDto[]> {
+  async getGenerators(user: RequestingUser): Promise<GeneratorsResponseDto[]> {
     const result = await this.db.generator.findMany({
+      where: generatorWhere(user),
       select: {
         id: true,
         name: true,

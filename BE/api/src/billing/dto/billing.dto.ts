@@ -55,6 +55,33 @@ export class MonthlySummaryDto {
   @ApiProperty({ type: [GroupSummaryLineDto] }) byGroup!: GroupSummaryLineDto[];
 }
 
+export class RegionGroupBillingLineDto {
+  @ApiProperty() groupId!: string;
+  @ApiProperty() groupName!: string;
+  @ApiProperty() customerCount!: number;
+  @ApiProperty() totalBilled!: number;
+  @ApiProperty() totalPaid!: number;
+  @ApiProperty() outstanding!: number;
+  @ApiProperty() collectionRate!: number;
+}
+
+export class RegionMonthlyTrendPointDto {
+  @ApiProperty() month!: string;
+  @ApiProperty() billed!: number;
+  @ApiProperty() paid!: number;
+}
+
+export class RegionBillingSummaryDto {
+  @ApiProperty({ description: 'All-time total across every bill and deposit for customers in this region' })
+  totalBilled!: number;
+  @ApiProperty() totalPaid!: number;
+  @ApiProperty() outstanding!: number;
+  @ApiProperty() collectionRate!: number;
+  @ApiProperty({ type: [RegionGroupBillingLineDto] }) byGroup!: RegionGroupBillingLineDto[];
+  @ApiProperty({ type: [RegionMonthlyTrendPointDto], description: 'Last 6 calendar months, recurring monthly bills only (deposits excluded)' })
+  monthlyTrend!: RegionMonthlyTrendPointDto[];
+}
+
 export class MonthlyCustomerEntryDto {
   @ApiProperty() consumptionId!: string;
   @ApiProperty() customerId!: string;

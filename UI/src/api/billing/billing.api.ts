@@ -134,6 +134,36 @@ export const getMonthlySummary = async (month: string): Promise<MonthlySummary> 
   return data;
 };
 
+export interface RegionGroupBillingLine {
+  groupId: string;
+  groupName: string;
+  customerCount: number;
+  totalBilled: number;
+  totalPaid: number;
+  outstanding: number;
+  collectionRate: number;
+}
+
+export interface RegionMonthlyTrendPoint {
+  month: string;
+  billed: number;
+  paid: number;
+}
+
+export interface RegionBillingSummary {
+  totalBilled: number;
+  totalPaid: number;
+  outstanding: number;
+  collectionRate: number;
+  byGroup: RegionGroupBillingLine[];
+  monthlyTrend: RegionMonthlyTrendPoint[];
+}
+
+export const getRegionBillingSummary = async (regionId: string): Promise<RegionBillingSummary> => {
+  const { data } = await api.get<RegionBillingSummary>(`/billing/region/${regionId}/summary`);
+  return data;
+};
+
 export const getMonthlyReceivables = async (month: string): Promise<MonthlyCustomerEntry[]> => {
   const { data } = await api.get<MonthlyCustomerEntry[]>('/billing/accounting/receivables', { params: { month } });
   return data;

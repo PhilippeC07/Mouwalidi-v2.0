@@ -15,6 +15,18 @@
 .stateText { color: var(--tx-4); font-size: 0.9rem; }
 .stateErr  { color: #f87171;    font-size: 0.9rem; }
 
+/* ── Skeleton loader (Prev/Next + first load, while data is fetching) ── */
+@keyframes skeletonPulse {
+  0%   { opacity: 0.5; }
+  50%  { opacity: 1; }
+  100% { opacity: 0.5; }
+}
+.skeleton {
+  background: var(--bg-3);
+  animation: skeletonPulse 1.3s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
 /* ── Header ── */
 .header {
   background: var(--bg-0);
@@ -37,6 +49,26 @@
   transition: color 0.15s;
 }
 .backBtn:hover { color: var(--tx-1); }
+
+.navGroup { display: inline-flex; align-items: center; gap: 6px; }
+
+.navBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid var(--br);
+  background: var(--bg-1);
+  color: var(--tx-3);
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+.navBtn:hover:not(:disabled) { background-color: var(--bg-3); color: var(--tx-0); }
+.navBtn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.navPosition { font-size: 0.75rem; color: var(--tx-4); white-space: nowrap; }
 
 .headerActionBtn {
   display: flex;

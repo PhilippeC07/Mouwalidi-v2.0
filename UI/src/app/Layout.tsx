@@ -1,19 +1,27 @@
 import { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { Menu } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { RegionsProvider } from '../context/RegionsContext';
 import { ThemeProvider } from '../context/ThemeContext';
 import { ReceiptTemplateProvider } from '../context/ReceiptTemplateContext';
+import { useAuth } from '../context/AuthContext';
 import styles from './app.module.scss';
 
 export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { user, loading } = useAuth();
+  const location = useLocation();
 
-  return (
-    <ThemeProvider>
-    <ReceiptTemplateProvider>
-    <RegionsProvider>
+  if (loading) return null;
+  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+
+  if (user.role === 'CUSTOMER') {
+    const ownRoute = `/customers/${user.customerId}`;
+    if (location.pathname !== ownRoute) return <Navigate to={ownRoute} replace />;
+  }
+
+  const body = (
     <div className={styles.root}>
       {sidebarOpen && (
         <div className={styles.overlay} onClick={() => setSidebarOpen(false)} />
@@ -41,7 +49,12 @@ export function Layout() {
         </div>
       </div>
     </div>
-    </RegionsProvider>
+  );
+
+  return (
+    <ThemeProvider>
+    <ReceiptTemplateProvider>
+      {user.role === 'CUSTOMER' ? body : <RegionsProvider>{body}</RegionsProvider>}
     </ReceiptTemplateProvider>
     </ThemeProvider>
   );

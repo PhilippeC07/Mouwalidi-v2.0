@@ -129,18 +129,24 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
   border-radius: 8px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
   transition: background-color 0.15s ease;
   margin-top: 2px;
 }
 
 .regionHeader:hover { background-color: var(--bg-2); }
 
-.regionHeaderLeft { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.regionHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+  padding: 8px 0 8px 12px;
+  text-decoration: none;
+  border-radius: 8px 0 0 8px;
+}
+.regionHeaderLeftActive .regionName { color: #60a5fa; }
 .regionIcon { color: var(--tx-4); flex-shrink: 0; }
 
 .regionName {
@@ -150,6 +156,17 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
   min-width: 0;
+}
+
+.regionChevronBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px 8px 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 0 8px 8px 0;
 }
 
 .regionChevron {
@@ -322,6 +339,40 @@
   flex-direction: column;
   gap: 4px;
 }
+
+/* ── User row ── */
+.userRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 8px;
+  min-width: 0;
+}
+
+.userEmail {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tx-4);
+  font-size: 0.78rem;
+}
+
+.logoutBtn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--tx-4);
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+.logoutBtn:hover { background-color: var(--bg-3); color: #f87171; }
 
 .settingsBtn {
   width: 100%;

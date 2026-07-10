@@ -42,6 +42,28 @@ export const updateRegion = async (id: string, name: string): Promise<void> => {
   await api.put(`/generator/region/${id}`, { name });
 };
 
+export interface RegionWhatsappError {
+  customerId: string;
+  customerName: string;
+  error: string;
+}
+
+export interface RegionWhatsappResult {
+  totalCustomers: number;
+  sent: number;
+  failed: number;
+  skippedNoPhone: number;
+  errors: RegionWhatsappError[];
+}
+
+export const sendRegionWhatsappBroadcast = async (
+  regionId: string,
+  message: string,
+): Promise<RegionWhatsappResult> => {
+  const { data } = await api.post<RegionWhatsappResult>(`/generator/region/${regionId}/whatsapp-broadcast`, { message });
+  return data;
+};
+
 export const deleteRegion = async (id: string): Promise<void> => {
   await api.delete(`/generator/region/${id}`);
 };

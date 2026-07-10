@@ -128,6 +128,27 @@ export class GroupOverviewDto {
   unpaidCount!: number;
 }
 
+export class SendRegionWhatsappDto {
+  @ApiProperty({ description: 'Message text to send to every customer in the region with a phone number on file' })
+  message!: string;
+}
+
+export class RegionWhatsappErrorDto {
+  @ApiProperty() customerId!: string;
+  @ApiProperty() customerName!: string;
+  @ApiProperty() error!: string;
+}
+
+export class RegionWhatsappResultDto {
+  @ApiProperty() totalCustomers!: number;
+  @ApiProperty() sent!: number;
+  @ApiProperty() failed!: number;
+  @ApiProperty({ description: 'Customers skipped because they have no phone number on file' })
+  skippedNoPhone!: number;
+  @ApiProperty({ type: [RegionWhatsappErrorDto] })
+  errors!: RegionWhatsappErrorDto[];
+}
+
 export class GeneratorsResponseDto {
   @ApiProperty()
   id!: string;

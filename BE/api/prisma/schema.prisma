@@ -14,10 +14,30 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  SUPERADMIN
+  ADMIN
+  CUSTOMER
+}
+
+model User {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email        String    @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime  @default(now())
+  role         Role      @default(ADMIN)
+  customerId   String?   @unique @db.Uuid
+  customer     Customer? @relation(fields: [customerId], references: [id])
+  ownedRegions Region[]  @relation("RegionOwner")
+}
+
 model Region {
   id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name            String           @unique
   generatorGroups GeneratorGroup[]
+  ownerId         String           @db.Uuid
+  owner           User             @relation("RegionOwner", fields: [ownerId], references: [id])
 }
 
 model Generator {
@@ -94,6 +114,7 @@ model Customer {
   consumptionType     ConsumptionType      @relation(fields: [consumptionTypeId], references: [id])
   buildingFloor       BuildingFloor?
   deposits            Deposit[]
+  user                User?
 }
 
 model Deposit {

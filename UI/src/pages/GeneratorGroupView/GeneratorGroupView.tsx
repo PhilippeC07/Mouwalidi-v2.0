@@ -68,6 +68,9 @@ interface CustomerForm {
   buildingId: string;
   floorNumber: string;
   apartmentSide: string;
+  createAccount: boolean;
+  accountEmail: string;
+  accountPassword: string;
 }
 
 const EMPTY_FORM: CustomerForm = {
@@ -83,6 +86,9 @@ const EMPTY_FORM: CustomerForm = {
   buildingId: '',
   floorNumber: '',
   apartmentSide: '',
+  createAccount: false,
+  accountEmail: '',
+  accountPassword: '',
 };
 
 export function GeneratorGroupView() {
@@ -368,6 +374,11 @@ export function GeneratorGroupView() {
     return list;
   })();
 
+  const hasActiveFilters = !!(
+    colFilters.name || colFilters.type || colFilters.building ||
+    colFilters.paymentStatus || colFilters.status || colFilters.phase || colFilters.balance
+  );
+
   const customersByBuilding = (() => {
     const groups = new Map<string, { label: string; items: CustomerListItem[] }>();
     for (const c of customers) {
@@ -414,6 +425,9 @@ export function GeneratorGroupView() {
       buildingId: c.buildingFloor?.buildingId ?? '',
       floorNumber: String(c.buildingFloor?.floorNumber ?? ''),
       apartmentSide: c.buildingFloor?.apartmentSide ?? '',
+      createAccount: false,
+      accountEmail: '',
+      accountPassword: '',
     });
     setEditingCustomerId(c.id);
     setModalOpen(true);
@@ -423,18 +437,24 @@ export function GeneratorGroupView() {
     e.preventDefault();
     setSubmitting(true);
     setSubmitError(null);
+    const { createAccount, accountEmail, accountPassword, ...rest } = form;
     try {
       if (editingCustomerId) {
-        await updateCustomer(editingCustomerId, { ...form, floorNumber: Number(form.floorNumber) });
+        await updateCustomer(editingCustomerId, { ...rest, floorNumber: Number(form.floorNumber) });
       } else {
-        await createCustomer({ ...form, floorNumber: Number(form.floorNumber) });
+        await createCustomer({
+          ...rest,
+          floorNumber: Number(form.floorNumber),
+          ...(createAccount ? { accountEmail: accountEmail.trim(), accountPassword } : {}),
+        });
       }
       setForm(EMPTY_FORM);
       setEditingCustomerId(null);
       setModalOpen(false);
       void refetchCustomers();
-    } catch {
-      setSubmitError(editingCustomerId ? 'Failed to save changes.' : 'Failed to create customer.');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setSubmitError(msg ?? (editingCustomerId ? 'Failed to save changes.' : 'Failed to create customer.'));
     } finally {
       setSubmitting(false);
     }
@@ -742,6 +762,48 @@ export function GeneratorGroupView() {
                     onChange={(e) => setField('description', e.target.value)}
                   />
                 </div>
+
+                {!editingCustomerId && (
+                  <div className={`${styles.formField} ${styles.formFieldFull}`}>
+                    <label className={styles.formCheckboxRow}>
+                      <input
+                        type="checkbox"
+                        className={styles.formCheckbox}
+                        checked={form.createAccount}
+                        onChange={(e) => setField('createAccount', e.target.checked)}
+                      />
+                      <span className={styles.formCheckboxLabel}>Create a login account for this customer</span>
+                    </label>
+                  </div>
+                )}
+
+                {!editingCustomerId && form.createAccount && (
+                  <>
+                    <div className={styles.formField}>
+                      <label className={styles.formLabel}>Account Email *</label>
+                      <input
+                        type="email"
+                        className={styles.formInput}
+                        placeholder="customer@example.com"
+                        value={form.accountEmail}
+                        onChange={(e) => setField('accountEmail', e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className={styles.formField}>
+                      <label className={styles.formLabel}>Account Password *</label>
+                      <input
+                        type="password"
+                        className={styles.formInput}
+                        placeholder="At least 8 characters"
+                        minLength={8}
+                        value={form.accountPassword}
+                        onChange={(e) => setField('accountPassword', e.target.value)}
+                        required
+                      />
+                    </div>
+                  </>
+                )}
               </div>
 
               {submitError && (
@@ -1178,6 +1240,13 @@ export function GeneratorGroupView() {
             <button className={`${styles.filterBtn} ${customerView === 'byType' ? styles.filterBtnActive : ''}`} onClick={() => setCustomerView('byType')}>
               <Zap size={13} /> By Subscription Type
             </button>
+            {customerView === 'table' && (
+              <span className={styles.resultCount}>
+                {hasActiveFilters
+                  ? `Showing ${filteredSortedCustomers.length} of ${customers.length} customers`
+                  : `${customers.length} customers`}
+              </span>
+            )}
           </div>
         )}
 
@@ -1268,7 +1337,7 @@ export function GeneratorGroupView() {
                       </select>
                     </th>
                     <th>
-                      {(colFilters.name || colFilters.type || colFilters.building || colFilters.paymentStatus || colFilters.status || colFilters.phase || colFilters.balance) && (
+                      {hasActiveFilters && (
                         <button type="button" className={styles.clearFiltersBtn} onClick={() => setColFilters(EMPTY_CUSTOMER_FILTERS)}>
                           Clear
                         </button>
@@ -1289,7 +1358,13 @@ export function GeneratorGroupView() {
                         <td className={styles.td}>
                           <div className={styles.clientNameCell}>
                             <div className={styles.avatar}>{initials}</div>
-                            <Link to={`/customers/${c.id}`} className={styles.clientNameLink}>{fullName(c)}</Link>
+                            <Link
+                              to={`/customers/${c.id}`}
+                              state={{ customerNavIds: filteredSortedCustomers.map((x) => x.id) }}
+                              className={styles.clientNameLink}
+                            >
+                              {fullName(c)}
+                            </Link>
                           </div>
                         </td>
                         <td className={`${styles.td} ${styles.tdGray}`}>
@@ -1305,7 +1380,11 @@ export function GeneratorGroupView() {
                             {c.consumptionStatus.Status}
                           </span>
                         </td>
-                        <td className={`${styles.td} ${styles.tdGray}`}>{c.status}</td>
+                        <td className={styles.td}>
+                          <span className={`${styles.inlineStatus} ${c.status === 'active' ? styles.pillActive : styles.pillInactive}`}>
+                            {c.status}
+                          </span>
+                        </td>
                         <td className={`${styles.td} ${styles.tdCenter}`}>
                           {renderMeterBadge(c)}
                         </td>
@@ -1348,7 +1427,15 @@ export function GeneratorGroupView() {
                         <tbody>
                           {g.items.map((c) => (
                             <tr key={c.id}>
-                              <td><Link to={`/customers/${c.id}`} className={styles.clientNameLink}>{fullName(c)}</Link></td>
+                              <td>
+                                <Link
+                                  to={`/customers/${c.id}`}
+                                  state={{ customerNavIds: g.items.map((x) => x.id) }}
+                                  className={styles.clientNameLink}
+                                >
+                                  {fullName(c)}
+                                </Link>
+                              </td>
                               <td>{c.buildingFloor ? `${c.buildingFloor.floorNumber} ${c.buildingFloor.apartmentSide}` : '—'}</td>
                               <td>{c.consumptionType.description}</td>
                               <td>
@@ -1399,7 +1486,15 @@ export function GeneratorGroupView() {
                         <tbody>
                           {g.items.map((c) => (
                             <tr key={c.id}>
-                              <td><Link to={`/customers/${c.id}`} className={styles.clientNameLink}>{fullName(c)}</Link></td>
+                              <td>
+                                <Link
+                                  to={`/customers/${c.id}`}
+                                  state={{ customerNavIds: g.items.map((x) => x.id) }}
+                                  className={styles.clientNameLink}
+                                >
+                                  {fullName(c)}
+                                </Link>
+                              </td>
                               <td>{c.buildingFloor ? `${buildingNameOf(c)} · Floor ${c.buildingFloor.floorNumber} ${c.buildingFloor.apartmentSide}` : '—'}</td>
                               <td>
                                 <span className={styles.inlineStatus} style={billStyleFor(c.consumptionStatus.Status)}>

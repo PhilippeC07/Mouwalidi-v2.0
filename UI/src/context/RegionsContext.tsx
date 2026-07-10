@@ -6,7 +6,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import axios from 'axios';
+import { api } from '../api/axios';
 
 export interface GeneratorItemModel {
   id: string;
@@ -67,8 +67,8 @@ export function RegionsProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.get<RegionResponseDto[]>(
-        '/api/generator/regions',
+      const response = await api.get<RegionResponseDto[]>(
+        '/generator/regions',
       );
       setData(
         response.data.map((region) => ({

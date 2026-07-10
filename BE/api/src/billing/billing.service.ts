@@ -1,6 +1,17 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service.js';
-import { CounterUpdateItemDto, CreateMonthlyBillingDto, CreateSingleBillingDto, CustomerAllTimeBalanceDto, CustomerBalanceDto, CustomerTypeSummaryDto, MonthlyCounterEntryDto, MonthlyCustomerEntryDto, MonthlySummaryDto, ReceiptDto, RegionSummaryLineDto, UpdateMonthlyConsumptionDto } from './dto/billing.dto.js';
+import { CounterUpdateItemDto, CreateMonthlyBillingDto, CreateSingleBillingDto, CustomerAllTimeBalanceDto, CustomerBalanceDto, CustomerTypeSummaryDto, MonthlyCounterEntryDto, MonthlyCustomerEntryDto, MonthlySummaryDto, ReceiptDto, RegionBillingSummaryDto, RegionGroupBillingLineDto, RegionSummaryLineDto, UpdateMonthlyConsumptionDto } from './dto/billing.dto.js';
+import {
+  assertCustomerOwned,
+  assertCustomersOwned,
+  assertGeneratorGroupOwned,
+  assertMonthlyConsumptionsOwned,
+  assertRegionOwned,
+  isSuperAdmin,
+  ownerScope,
+  type RequestingUser,
+} from '../auth/ownership.util.js';
+import { Role } from '../generated/prisma/client.js';
 
 @Injectable()
 export class BillingService {
@@ -23,7 +34,8 @@ export class BillingService {
     return defaultStatus;
   }
 
-  async createMonthlyBilling(dto: CreateMonthlyBillingDto) {
+  async createMonthlyBilling(dto: CreateMonthlyBillingDto, user: RequestingUser) {
+    await assertGeneratorGroupOwned(this.db, user, dto.generatorGroupId);
     const date = new Date(`${dto.month}-01T00:00:00.000Z`);
 
     // Prevent duplicate: same group + month + type
@@ -115,7 +127,8 @@ export class BillingService {
   }
 
   /** Whether a billing rate already exists for this customer's group/type for the given month. */
-  async getCustomerMonthlyRate(customerId: string, month: string) {
+  async getCustomerMonthlyRate(customerId: string, month: string, user: RequestingUser) {
+    await assertCustomerOwned(this.db, user, customerId);
     const date = new Date(`${month}-01T00:00:00.000Z`);
 
     const customer = await this.db.customer.findUnique({
@@ -137,7 +150,8 @@ export class BillingService {
   }
 
   /** Adds a single missing bill for one customer — e.g. a month a bulk billing run skipped them. */
-  async createSingleBilling(customerId: string, dto: CreateSingleBillingDto) {
+  async createSingleBilling(customerId: string, dto: CreateSingleBillingDto, user: RequestingUser) {
+    await assertCustomerOwned(this.db, user, customerId);
     const date = new Date(`${dto.month}-01T00:00:00.000Z`);
 
     const customer = await this.db.customer.findUnique({
@@ -225,7 +239,8 @@ export class BillingService {
     });
   }
 
-  async updateMonthlyConsumption(id: string, dto: UpdateMonthlyConsumptionDto) {
+  async updateMonthlyConsumption(id: string, dto: UpdateMonthlyConsumptionDto, user: RequestingUser) {
+    await assertMonthlyConsumptionsOwned(this.db, user, [id]);
     const { paidDate, ...rest } = dto;
 
     // Track when a payment was made: use the explicit date if given, otherwise
@@ -266,16 +281,32 @@ export class BillingService {
     return { gte: new Date(Date.UTC(y, m - 1, 1)), lt: new Date(Date.UTC(y, m, 1)) };
   }
 
+  /** The last `n` calendar months (YYYY-MM), ending with the current month. */
+  private lastNMonths(n: number): string[] {
+    const now = new Date();
+    const months: string[] = [];
+    for (let i = n - 1; i >= 0; i--) {
+      const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+      months.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`);
+    }
+    return months;
+  }
+
   private calcBalance(c: { isCounter: boolean; previousCounter: number; currentCounter: number; kwhPrice: number; monthlyFee: number; balanceOverride?: number | null }) {
     if (c.balanceOverride != null) return c.balanceOverride;
     return c.isCounter ? (c.currentCounter - c.previousCounter) * c.kwhPrice + c.monthlyFee : c.monthlyFee;
   }
 
-  private async fetchMonthConsumptions(month: string, generatorGroupId?: string) {
+  private async fetchMonthConsumptions(month: string, user: RequestingUser, generatorGroupId?: string) {
     return this.db.monthlyConsumption.findMany({
       where: {
         date: this.monthBounds(month),
-        ...(generatorGroupId ? { customer: { consumptionType: { generatorGroupId } } } : {}),
+        customer: {
+          consumptionType: {
+            ...(generatorGroupId ? { generatorGroupId } : {}),
+            generatorGroup: { region: { ...ownerScope(user) } },
+          },
+        },
       },
       select: {
         id: true,
@@ -308,8 +339,8 @@ export class BillingService {
     });
   }
 
-  async getMonthlySummary(month: string): Promise<MonthlySummaryDto> {
-    const consumptions = await this.fetchMonthConsumptions(month);
+  async getMonthlySummary(month: string, user: RequestingUser): Promise<MonthlySummaryDto> {
+    const consumptions = await this.fetchMonthConsumptions(month, user);
 
     const groupMap = new Map<string, { groupName: string; regionName: string; totalBilled: number; totalPaid: number; outstanding: number; customerCount: number }>();
 
@@ -381,8 +412,8 @@ export class BillingService {
     return { month, totalBilled, totalPaid, outstanding, collectionRate: totalBilled > 0 ? (totalPaid / totalBilled) * 100 : 100, counter, fixed, byGroup, byRegion };
   }
 
-  async getMonthlyReceivables(month: string): Promise<MonthlyCustomerEntryDto[]> {
-    const consumptions = await this.fetchMonthConsumptions(month);
+  async getMonthlyReceivables(month: string, user: RequestingUser): Promise<MonthlyCustomerEntryDto[]> {
+    const consumptions = await this.fetchMonthConsumptions(month, user);
     return consumptions
       .map((c) => {
         const balance = this.calcBalance({ isCounter: c.customer.isCounter, previousCounter: c.previousCounter, currentCounter: c.currentCounter, kwhPrice: c.kwhPrice, monthlyFee: c.monthlyFee, balanceOverride: c.balanceOverride });
@@ -393,8 +424,8 @@ export class BillingService {
       .sort((a, b) => b.remaining - a.remaining);
   }
 
-  async getMonthlyPayments(month: string): Promise<MonthlyCustomerEntryDto[]> {
-    const consumptions = await this.fetchMonthConsumptions(month);
+  async getMonthlyPayments(month: string, user: RequestingUser): Promise<MonthlyCustomerEntryDto[]> {
+    const consumptions = await this.fetchMonthConsumptions(month, user);
     return consumptions
       .map((c) => {
         const balance = this.calcBalance({ isCounter: c.customer.isCounter, previousCounter: c.previousCounter, currentCounter: c.currentCounter, kwhPrice: c.kwhPrice, monthlyFee: c.monthlyFee, balanceOverride: c.balanceOverride });
@@ -410,8 +441,9 @@ export class BillingService {
       });
   }
 
-  async getMonthlyCustomerBalances(month: string, generatorGroupId: string): Promise<CustomerBalanceDto[]> {
-    const consumptions = await this.fetchMonthConsumptions(month, generatorGroupId);
+  async getMonthlyCustomerBalances(month: string, generatorGroupId: string, user: RequestingUser): Promise<CustomerBalanceDto[]> {
+    await assertGeneratorGroupOwned(this.db, user, generatorGroupId);
+    const consumptions = await this.fetchMonthConsumptions(month, user, generatorGroupId);
     return consumptions.map((c) => {
       const balance = this.calcBalance({
         isCounter: c.customer.isCounter,
@@ -439,7 +471,8 @@ export class BillingService {
    * month that group hasn't been billed for yet even though customers may
    * still owe money from other months.
    */
-  async getGroupCustomerAllTimeBalances(generatorGroupId: string): Promise<CustomerAllTimeBalanceDto[]> {
+  async getGroupCustomerAllTimeBalances(generatorGroupId: string, user: RequestingUser): Promise<CustomerAllTimeBalanceDto[]> {
+    await assertGeneratorGroupOwned(this.db, user, generatorGroupId);
     const [consumptions, deposits] = await Promise.all([
       this.db.monthlyConsumption.findMany({
         where: { customer: { consumptionType: { generatorGroupId } } },
@@ -495,8 +528,143 @@ export class BillingService {
     return Array.from(byCustomer.entries()).map(([customerId, remaining]) => ({ customerId, remaining }));
   }
 
-  async getMonthlyCounterEntries(month: string, generatorGroupId: string): Promise<MonthlyCounterEntryDto[]> {
-    const consumptions = await this.fetchMonthConsumptions(month, generatorGroupId);
+  /**
+   * All-time billing totals for a region (across all its generator groups),
+   * plus a per-group breakdown and a last-6-month trend for charting. Uses
+   * the same all-time approach as getGroupCustomerAllTimeBalances rather than
+   * a single-month snapshot, so a region isn't billed for the current
+   * calendar month yet doesn't read as "no activity".
+   */
+  async getRegionBillingSummary(regionId: string, user: RequestingUser): Promise<RegionBillingSummaryDto> {
+    await assertRegionOwned(this.db, user, regionId);
+    const [consumptions, deposits] = await Promise.all([
+      this.db.monthlyConsumption.findMany({
+        where: { customer: { consumptionType: { generatorGroup: { regionId } } } },
+        select: {
+          date: true,
+          previousCounter: true,
+          currentCounter: true,
+          monthlyFee: true,
+          balanceOverride: true,
+          amountPaid: true,
+          kwhPrice: true,
+          closedBalance: true,
+          customer: {
+            select: {
+              id: true,
+              isCounter: true,
+              consumptionType: { select: { generatorGroup: { select: { id: true, name: true } } } },
+            },
+          },
+        },
+      }),
+      this.db.deposit.findMany({
+        where: { customer: { consumptionType: { generatorGroup: { regionId } } } },
+        select: {
+          amount: true,
+          paidAmount: true,
+          customer: {
+            select: {
+              id: true,
+              consumptionType: { select: { generatorGroup: { select: { id: true, name: true } } } },
+            },
+          },
+        },
+      }),
+    ]);
+
+    type GroupAcc = { groupName: string; totalBilled: number; totalPaid: number; outstanding: number; customerIds: Set<string> };
+    const byGroupMap = new Map<string, GroupAcc>();
+    const trendMap = new Map<string, { billed: number; paid: number }>();
+    let totalBilled = 0;
+    let totalPaid = 0;
+    let outstanding = 0;
+
+    const ensureGroup = (id: string, name: string): GroupAcc => {
+      if (!byGroupMap.has(id)) byGroupMap.set(id, { groupName: name, totalBilled: 0, totalPaid: 0, outstanding: 0, customerIds: new Set() });
+      return byGroupMap.get(id)!;
+    };
+
+    for (const c of consumptions) {
+      const grp = c.customer.consumptionType.generatorGroup;
+      if (!grp) continue;
+      const balance = this.calcBalance({
+        isCounter: c.customer.isCounter,
+        previousCounter: c.previousCounter,
+        currentCounter: c.currentCounter,
+        kwhPrice: c.kwhPrice,
+        monthlyFee: c.monthlyFee,
+        balanceOverride: c.balanceOverride,
+      });
+
+      const g = ensureGroup(grp.id, grp.name);
+      g.totalBilled += balance;
+      g.totalPaid += c.amountPaid;
+      g.customerIds.add(c.customer.id);
+      totalBilled += balance;
+      totalPaid += c.amountPaid;
+
+      if (!c.closedBalance) {
+        const remaining = balance - c.amountPaid;
+        if (remaining > 0.001) {
+          outstanding += remaining;
+          g.outstanding += remaining;
+        }
+      }
+
+      const monthKey = c.date.toISOString().slice(0, 7);
+      if (!trendMap.has(monthKey)) trendMap.set(monthKey, { billed: 0, paid: 0 });
+      const t = trendMap.get(monthKey)!;
+      t.billed += balance;
+      t.paid += c.amountPaid;
+    }
+
+    for (const d of deposits) {
+      const grp = d.customer.consumptionType.generatorGroup;
+      if (!grp) continue;
+      const remaining = d.amount - d.paidAmount;
+
+      const g = ensureGroup(grp.id, grp.name);
+      g.totalBilled += d.amount;
+      g.totalPaid += d.paidAmount;
+      g.customerIds.add(d.customer.id);
+      totalBilled += d.amount;
+      totalPaid += d.paidAmount;
+      if (remaining > 0.001) {
+        outstanding += remaining;
+        g.outstanding += remaining;
+      }
+    }
+
+    const byGroup: RegionGroupBillingLineDto[] = Array.from(byGroupMap.entries()).map(([groupId, g]) => ({
+      groupId,
+      groupName: g.groupName,
+      customerCount: g.customerIds.size,
+      totalBilled: g.totalBilled,
+      totalPaid: g.totalPaid,
+      outstanding: g.outstanding,
+      collectionRate: g.totalBilled > 0 ? (g.totalPaid / g.totalBilled) * 100 : 100,
+    }));
+
+    const monthlyTrend = this.lastNMonths(6).map((month) => ({
+      month,
+      billed: trendMap.get(month)?.billed ?? 0,
+      paid: trendMap.get(month)?.paid ?? 0,
+    }));
+
+    return {
+      totalBilled,
+      totalPaid,
+      outstanding,
+      collectionRate: totalBilled > 0 ? (totalPaid / totalBilled) * 100 : 100,
+      byGroup,
+      monthlyTrend,
+    };
+  }
+
+  async getMonthlyCounterEntries(month: string, generatorGroupId: string, user: RequestingUser): Promise<MonthlyCounterEntryDto[]> {
+    await assertGeneratorGroupOwned(this.db, user, generatorGroupId);
+    const consumptions = await this.fetchMonthConsumptions(month, user, generatorGroupId);
     return consumptions
       .filter((c) => c.customer.isCounter)
       .map((c) => ({
@@ -513,8 +681,9 @@ export class BillingService {
       .sort((a, b) => a.customerName.localeCompare(b.customerName));
   }
 
-  async bulkUpdateCounters(updates: CounterUpdateItemDto[]) {
+  async bulkUpdateCounters(updates: CounterUpdateItemDto[], user: RequestingUser) {
     if (updates.length === 0) return { updated: 0 };
+    await assertMonthlyConsumptionsOwned(this.db, user, updates.map((u) => u.consumptionId));
     const results = await this.db.$transaction(
       updates.map((u) =>
         this.db.monthlyConsumption.update({
@@ -526,8 +695,17 @@ export class BillingService {
     return { updated: results.length };
   }
 
-  async getReceipts(customerIds: string[], months: string[]): Promise<ReceiptDto[]> {
+  async getReceipts(customerIds: string[], months: string[], user: RequestingUser): Promise<ReceiptDto[]> {
     if (customerIds.length === 0 || months.length === 0) return [];
+
+    if (user.role === Role.CUSTOMER) {
+      if (customerIds.length !== 1 || customerIds[0] !== user.customerId) {
+        throw new NotFoundException('One or more customers were not found.');
+      }
+    } else if (!isSuperAdmin(user)) {
+      await assertCustomersOwned(this.db, user, customerIds);
+    }
+
     const ranges = months.map((m) => this.monthBounds(m));
 
     const consumptions = await this.db.monthlyConsumption.findMany({
@@ -588,7 +766,8 @@ export class BillingService {
     });
   }
 
-  async getMonthlyBillings(generatorGroupId: string, isCounter: boolean) {
+  async getMonthlyBillings(generatorGroupId: string, isCounter: boolean, user: RequestingUser) {
+    await assertGeneratorGroupOwned(this.db, user, generatorGroupId);
     const entries = await this.db.monthlyPrice.findMany({
       where: { generatorGroupId, isCounter },
       select: {

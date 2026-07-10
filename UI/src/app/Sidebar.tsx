@@ -13,9 +13,11 @@ import {
   BookOpen,
   Sun,
   Moon,
+  LogOut,
 } from 'lucide-react';
 import { useRegions } from '../hooks/useGetRegions';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import styles from './Sidebar.module.css';
 
 interface SidebarProps {
@@ -25,6 +27,7 @@ interface SidebarProps {
 export function Sidebar({ onCloseSidebar }: SidebarProps) {
   const { data: regions, loading, error } = useRegions();
   const { theme, toggle } = useTheme();
+  const { user, logout } = useAuth();
 
   const [collapsedRegions, setCollapsedRegions] = useState<Set<string>>(
     new Set(),
@@ -64,6 +67,31 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
   const handleNavigate = () => {
     onCloseSidebar?.();
   };
+
+  if (user?.role === 'CUSTOMER') {
+    return (
+      <div className={styles.sidebar}>
+        <div className={styles.logoSection}>
+          <div className={styles.logoIcon}>
+            <Zap size={18} color="#030712" />
+          </div>
+          <div>
+            <p className={styles.logoName}>Mouwalidi</p>
+            <p className={styles.logoSub}>Power Management</p>
+          </div>
+        </div>
+
+        <div className={styles.bottom} style={{ marginTop: 'auto', borderTop: 'none' }}>
+          <div className={styles.userRow}>
+            <span className={styles.userEmail} title={user.email}>{user.name || user.email}</span>
+            <button className={styles.logoutBtn} onClick={logout} title="Log out">
+              <LogOut size={14} />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.sidebar}>
@@ -119,24 +147,33 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
               return (
                 <div key={region.id} className={styles.regionGroup}>
                   {/* Region */}
-                  <button
-                    type="button"
-                    className={styles.regionHeader}
-                    onClick={() => toggleRegion(region.id)}
-                    aria-expanded={!isRegionCollapsed}
-                  >
-                    <div className={styles.regionHeaderLeft}>
+                  <div className={styles.regionHeader}>
+                    <NavLink
+                      to={`/region/${region.id}`}
+                      className={({ isActive }) =>
+                        `${styles.regionHeaderLeft} ${isActive ? styles.regionHeaderLeftActive : ''}`
+                      }
+                      onClick={handleNavigate}
+                    >
                       <MapPin size={13} className={styles.regionIcon} />
                       <span className={styles.regionName}>{region.label}</span>
-                    </div>
+                    </NavLink>
 
-                    <ChevronDown
-                      size={13}
-                      className={`${styles.regionChevron} ${
-                        isRegionCollapsed ? styles.regionChevronCollapsed : ''
-                      }`}
-                    />
-                  </button>
+                    <button
+                      type="button"
+                      className={styles.regionChevronBtn}
+                      onClick={() => toggleRegion(region.id)}
+                      aria-expanded={!isRegionCollapsed}
+                      aria-label={isRegionCollapsed ? 'Expand region' : 'Collapse region'}
+                    >
+                      <ChevronDown
+                        size={13}
+                        className={`${styles.regionChevron} ${
+                          isRegionCollapsed ? styles.regionChevronCollapsed : ''
+                        }`}
+                      />
+                    </button>
+                  </div>
 
                   {!isRegionCollapsed && (
                     <div className={styles.groupList}>
@@ -281,6 +318,15 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
           {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
           <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
         </button>
+
+        {user && (
+          <div className={styles.userRow}>
+            <span className={styles.userEmail} title={user.email}>{user.name || user.email}</span>
+            <button className={styles.logoutBtn} onClick={logout} title="Log out">
+              <LogOut size={14} />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

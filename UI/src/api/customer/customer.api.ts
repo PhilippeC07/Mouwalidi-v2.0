@@ -16,6 +16,8 @@ export interface CreateCustomerPayload {
   buildingId: string;
   floorNumber: number;
   apartmentSide: string;
+  accountEmail?: string;
+  accountPassword?: string;
 }
 
 export interface ConsumptionStatusDto {

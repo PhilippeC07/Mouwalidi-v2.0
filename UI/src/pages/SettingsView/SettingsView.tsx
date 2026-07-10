@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   MapPin, FolderTree, ChevronDown, ChevronRight, Zap, Gauge,
   Plus, CheckCircle, AlertCircle, Loader, Layers,
-  PlugZap, Pencil, Trash2,
+  PlugZap, Pencil, Trash2, UserPlus, Users,
 } from 'lucide-react';
 import { useRegions, type RegionGroupModel, type RegionModel } from '../../hooks/useGetRegions';
 import { useMonthlyBillings } from '../../hooks/useMonthlyBillings';
@@ -12,7 +12,10 @@ import {
   createGeneratorGroup, updateGeneratorGroup, deleteGeneratorGroup,
   createGenerator, updateGenerator, deleteGenerator,
 } from '../../api/generator/generator.api';
+import { getUsers, registerAccount, type AuthUser } from '../../api/auth/auth.api';
+import { getCustomers, type CustomerListItem } from '../../api/customer/customer.api';
 import { useRegionsContext } from '../../context/RegionsContext';
+import { useAuth } from '../../context/AuthContext';
 import { formatMoney } from '../../utils/format';
 import { useReceiptTemplate, type ReceiptTemplateId } from '../../context/ReceiptTemplateContext';
 import { ReceiptTemplatePreview } from '../../components/receipts/ReceiptTemplatePreview';
@@ -923,14 +926,201 @@ function ReceiptCompanyInfoCard() {
 }
 
 /* ─────────────────────────────────────────────────
+   Accounts — list existing accounts + create new ones.
+   No public sign-up: only someone already logged in can add an account.
+───────────────────────────────────────────────── */
+function CreateAccountCard({ onSuccess }: { onSuccess: () => void }) {
+  const { user: currentUser } = useAuth();
+  const isSuperAdmin = currentUser?.role === 'SUPERADMIN';
+  const { data: regions } = useRegionsContext();
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [role, setRole] = useState<'ADMIN' | 'CUSTOMER'>(isSuperAdmin ? 'ADMIN' : 'CUSTOMER');
+  const [groupId, setGroupId] = useState('');
+  const [customerId, setCustomerId] = useState('');
+  const [customers, setCustomers] = useState<CustomerListItem[]>([]);
+  const [customersLoading, setCustomersLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [ok, setOk] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const allGroups = regions.flatMap((r) => r.groups.map((g) => ({ id: g.id, label: g.label, regionLabel: r.label })));
+
+  useEffect(() => {
+    if (role !== 'CUSTOMER' || !groupId) { setCustomers([]); return; }
+    let cancelled = false;
+    setCustomersLoading(true);
+    getCustomers(groupId)
+      .then((data) => { if (!cancelled) setCustomers(data); })
+      .catch(() => { if (!cancelled) setCustomers([]); })
+      .finally(() => { if (!cancelled) setCustomersLoading(false); });
+    return () => { cancelled = true; };
+  }, [role, groupId]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitting(true); setOk(false); setErr(null);
+    try {
+      await registerAccount(email.trim(), password, role, name.trim() || undefined, role === 'CUSTOMER' ? customerId : undefined);
+      setEmail(''); setPassword(''); setName(''); setGroupId(''); setCustomerId(''); setOk(true); onSuccess();
+      setTimeout(() => setOk(false), 3000);
+    } catch (e: unknown) {
+      setErr(apiErr(e));
+    } finally { setSubmitting(false); }
+  }
+
+  const needsCustomer = role === 'CUSTOMER';
+  const canSubmit = email.trim() && password.length >= 8 && (!needsCustomer || customerId);
+
+  return (
+    <div className={styles.infraCard}>
+      <div className={styles.infraCardHeader}>
+        <UserPlus size={14} className={styles.infraIcon} style={{ color: '#34d399' }} />
+        <span className={styles.infraCardTitle}>Add Account</span>
+      </div>
+      <form onSubmit={handleSubmit} className={styles.infraForm}>
+        {isSuperAdmin && (
+          <div className={styles.infraField}>
+            <label className={styles.infraLabel}>Account Type</label>
+            <select
+              className={styles.infraSelect}
+              value={role}
+              onChange={e => { setRole(e.target.value as 'ADMIN' | 'CUSTOMER'); setGroupId(''); setCustomerId(''); }}
+            >
+              <option value="ADMIN">Admin (client)</option>
+              <option value="CUSTOMER">Customer</option>
+            </select>
+          </div>
+        )}
+
+        {needsCustomer && (
+          <>
+            <div className={styles.infraField}>
+              <label className={styles.infraLabel}>Generator Group</label>
+              <select
+                className={styles.infraSelect}
+                value={groupId}
+                onChange={e => { setGroupId(e.target.value); setCustomerId(''); }}
+                required
+              >
+                <option value="">Select group…</option>
+                {allGroups.map(g => (
+                  <option key={g.id} value={g.id}>{g.regionLabel} › {g.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className={styles.infraField}>
+              <label className={styles.infraLabel}>Customer</label>
+              <select
+                className={styles.infraSelect}
+                value={customerId}
+                onChange={e => setCustomerId(e.target.value)}
+                disabled={!groupId || customersLoading}
+                required
+              >
+                <option value="">{customersLoading ? 'Loading…' : 'Select customer…'}</option>
+                {customers.map(c => (
+                  <option key={c.id} value={c.id}>{[c.firstName, c.middleName, c.lastName].filter(Boolean).join(' ')}</option>
+                ))}
+              </select>
+            </div>
+          </>
+        )}
+
+        <div className={styles.infraField}>
+          <label className={styles.infraLabel}>Full Name</label>
+          <input
+            className={styles.infraInput}
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder="Optional"
+          />
+        </div>
+        <div className={styles.infraField}>
+          <label className={styles.infraLabel}>Email</label>
+          <input
+            className={styles.infraInput}
+            type="email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="name@example.com"
+            required
+          />
+        </div>
+        <div className={styles.infraField}>
+          <label className={styles.infraLabel}>Password</label>
+          <input
+            className={styles.infraInput}
+            type="password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            placeholder="At least 8 characters"
+            minLength={8}
+            required
+          />
+        </div>
+        {ok  && <div className={styles.infraSuccess}><CheckCircle size={13} /> Account created.</div>}
+        {err && <div className={styles.infraError}><AlertCircle size={13} /> {err}</div>}
+        <button className={styles.infraBtn} disabled={submitting || !canSubmit}>
+          {submitting ? <Loader size={13} className={styles.spin} /> : <Plus size={13} />}
+          Create Account
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function AccountsList({ refreshKey }: { refreshKey: number }) {
+  const [accounts, setAccounts] = useState<AuthUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getUsers()
+      .then((data) => { if (!cancelled) setAccounts(data); })
+      .catch((e: unknown) => { if (!cancelled) setErr(apiErr(e)); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [refreshKey]);
+
+  return (
+    <div className={styles.infraCard}>
+      <div className={styles.infraCardHeader}>
+        <Users size={14} style={{ color: '#60a5fa' }} />
+        <span className={styles.infraCardTitle}>Accounts</span>
+        <span className={styles.manageBadge}>{accounts.length}</span>
+      </div>
+      <div className={styles.manageList}>
+        {loading && <p className={styles.manageEmpty}>Loading…</p>}
+        {err && <p className={styles.manageErr}>{err}</p>}
+        {!loading && !err && accounts.length === 0 && <p className={styles.manageEmpty}>No accounts yet.</p>}
+        {!loading && !err && accounts.map((a) => (
+          <div key={a.id} className={styles.manageItem}>
+            <div className={styles.manageItemLeft}>
+              <span className={styles.manageItemName}>{a.name || a.email}</span>
+              <span className={styles.manageItemMeta}>{a.email}</span>
+            </div>
+            <span className={styles.manageBadge}>{a.role}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────
    SettingsView — main page
 ───────────────────────────────────────────────── */
 export function SettingsView() {
   const { data: regions, loading, error, refetch: refetchRegions } = useRegions();
   const [collapsedRegions, setCollapsedRegions] = useState<Set<string>>(new Set());
   const [regionKeys, setRegionKeys] = useState<Record<string, number>>({});
-  const [activeTab, setActiveTab] = useState<'infrastructure' | 'billing' | 'receipts'>('infrastructure');
+  const [activeTab, setActiveTab] = useState<'infrastructure' | 'billing' | 'receipts' | 'accounts'>('infrastructure');
   const { template: selectedReceiptTemplate, setTemplate: setSelectedReceiptTemplate } = useReceiptTemplate();
+  const [accountsRefreshKey, setAccountsRefreshKey] = useState(0);
 
   function toggleRegion(id: string) {
     setCollapsedRegions((prev) => {
@@ -969,6 +1159,12 @@ export function SettingsView() {
           onClick={() => setActiveTab('receipts')}
         >
           Receipts
+        </button>
+        <button
+          className={`${styles.tabBtn} ${activeTab === 'accounts' ? styles.tabBtnActive : ''}`}
+          onClick={() => setActiveTab('accounts')}
+        >
+          Accounts
         </button>
       </div>
 
@@ -1104,6 +1300,19 @@ export function SettingsView() {
                   </button>
                 );
               })}
+            </div>
+          </section>
+        )}
+
+        {activeTab === 'accounts' && (
+          <section className={styles.section}>
+            <h2 className={styles.sectionTitle}>Accounts</h2>
+            <p className={styles.sectionDesc}>
+              There is no public sign-up — only someone already logged in can create a new account.
+            </p>
+            <div className={styles.infraGrid}>
+              <CreateAccountCard onSuccess={() => setAccountsRefreshKey((k) => k + 1)} />
+              <AccountsList refreshKey={accountsRefreshKey} />
             </div>
           </section>
         )}

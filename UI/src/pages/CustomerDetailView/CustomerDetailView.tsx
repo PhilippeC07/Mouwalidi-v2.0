@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
   Phone,
   Building2,
   Zap,
@@ -18,6 +20,7 @@ import {
 import * as Dialog from '@radix-ui/react-dialog';
 import { useCustomerDetails } from '../../hooks/useCustomerDetails';
 import { usePersistentState } from '../../hooks/usePersistentState';
+import { useAuth } from '../../context/AuthContext';
 import type {
   MonthlyConsumptionRecord,
   DepositRecord,
@@ -60,9 +63,30 @@ interface DepositRowState {
   paidDate: string;
 }
 
+function SkeletonBlock({ width, height, radius = 6 }: { width: number | string; height: number; radius?: number }) {
+  return <div className={styles.skeleton} style={{ width, height, borderRadius: radius }} />;
+}
+
 export function CustomerDetailView() {
   const { customerId } = useParams<{ customerId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useAuth();
+  const isReadOnly = user?.role === 'CUSTOMER';
+
+  // Populated when arriving from a filtered/sorted customer list (e.g. the
+  // generator group page) so Prev/Next can walk that same order without
+  // returning to the list first.
+  const navIds = (location.state as { customerNavIds?: string[] } | null)?.customerNavIds ?? null;
+  const navIndex = navIds && customerId ? navIds.indexOf(customerId) : -1;
+  const prevCustomerId = navIds && navIndex > 0 ? navIds[navIndex - 1] : null;
+  const nextCustomerId = navIds && navIndex >= 0 && navIndex < navIds.length - 1 ? navIds[navIndex + 1] : null;
+
+  function goToSibling(id: string) {
+    // Replace (not push) so Back always returns to the list this navigation
+    // started from, no matter how many Prev/Next hops happened in between.
+    navigate(`/customers/${id}`, { state: { customerNavIds: navIds }, replace: true });
+  }
   const {
     data: customer,
     loading,
@@ -287,81 +311,86 @@ export function CustomerDetailView() {
     }
   }, [rows, customer]);
 
-  if (loading) {
+  if (error && !customer) {
     return (
       <div className={styles.centerState}>
-        <p className={styles.stateText}>Loading customer…</p>
+        <p className={styles.stateErr}>{error}</p>
       </div>
     );
   }
 
-  if (error || !customer) {
-    return (
-      <div className={styles.centerState}>
-        <p className={styles.stateErr}>{error ?? 'Customer not found.'}</p>
-      </div>
-    );
-  }
-
-  const fullName = [customer.firstName, customer.middleName, customer.lastName]
-    .filter(Boolean)
-    .join(' ');
-
-  const initials = (customer.firstName[0] + customer.lastName[0]).toUpperCase();
-  const isCounter = customer.consumptionType.isCounter;
-
-  // Derived from actual billing records rather than the customer's stored
-  // consumptionStatus label, which is set manually and can drift out of sync
-  // with what's really owed.
+  // True on the very first load (nothing to show yet) AND while a Next/Prev
+  // hop is in flight (the previous customer's data is still sitting in
+  // `customer` at that point, but showing it would look like a stale flash —
+  // a skeleton reads better than either a blank page or stale content).
+  let fullName = '';
+  let initials = '';
+  let isCounter = false;
   let totalBilled = 0;
   let totalOutstanding = 0;
   let totalUsage = 0;
   const chartPoints: { label: string; usage: number; balance: number }[] = [];
-  for (const m of customer.monthlyConsumptions) {
-    const row = rows[m.id] ?? rowFromRecord(m);
-    const prevCounter = parseNum(row.previousCounter, m.previousCounter);
-    const currCounter = parseNum(row.currentCounter, m.currentCounter);
-    const fee = parseNum(row.monthlyFee, m.monthlyFee);
-    const paid = parseNum(row.amountPaid, m.amountPaid);
-    const override =
-      row.balanceOverride !== '' ? parseNum(row.balanceOverride, 0) : null;
-    const usage = currCounter - prevCounter;
-    const balance = computeBalance(
-      isCounter,
-      prevCounter,
-      currCounter,
-      m.kwhPrice,
-      fee,
-      override,
-    );
-    const remaining = balance - paid;
-    totalBilled += balance;
-    totalUsage += usage;
-    if (!row.closedBalance) totalOutstanding += remaining;
-    chartPoints.push({ label: chartMonthLabel(m.date), usage, balance });
-  }
-  chartPoints.reverse(); // monthlyConsumptions arrives newest-first; charts read oldest→newest
+  let hasDue = false;
+  let avgUsage = 0;
+  let avgBalance = 0;
 
-  // Deposits are a one-off amount held from the customer, separate from the
-  // recurring monthly bills above — any unpaid portion still counts toward
-  // what the customer owes overall.
-  for (const d of customer.deposits) {
-    const depositRow = depositRows[d.id] ?? depositRowFromRecord(d);
-    const depositAmount = parseNum(depositRow.amount, d.amount);
-    const depositPaid = parseNum(depositRow.paidAmount, d.paidAmount);
-    const depositRemaining = depositAmount - depositPaid;
-    if (depositRemaining > 0.001) totalOutstanding += depositRemaining;
-  }
+  if (customer) {
+    fullName = [customer.firstName, customer.middleName, customer.lastName]
+      .filter(Boolean)
+      .join(' ');
 
-  const hasDue = totalOutstanding > 0.001;
-  const avgUsage =
-    customer.monthlyConsumptions.length > 0
-      ? totalUsage / customer.monthlyConsumptions.length
-      : 0;
-  const avgBalance =
-    customer.monthlyConsumptions.length > 0
-      ? totalBilled / customer.monthlyConsumptions.length
-      : 0;
+    initials = (customer.firstName[0] + customer.lastName[0]).toUpperCase();
+    isCounter = customer.consumptionType.isCounter;
+
+    // Derived from actual billing records rather than the customer's stored
+    // consumptionStatus label, which is set manually and can drift out of sync
+    // with what's really owed.
+    for (const m of customer.monthlyConsumptions) {
+      const row = rows[m.id] ?? rowFromRecord(m);
+      const prevCounter = parseNum(row.previousCounter, m.previousCounter);
+      const currCounter = parseNum(row.currentCounter, m.currentCounter);
+      const fee = parseNum(row.monthlyFee, m.monthlyFee);
+      const paid = parseNum(row.amountPaid, m.amountPaid);
+      const override =
+        row.balanceOverride !== '' ? parseNum(row.balanceOverride, 0) : null;
+      const usage = currCounter - prevCounter;
+      const balance = computeBalance(
+        isCounter,
+        prevCounter,
+        currCounter,
+        m.kwhPrice,
+        fee,
+        override,
+      );
+      const remaining = balance - paid;
+      totalBilled += balance;
+      totalUsage += usage;
+      if (!row.closedBalance) totalOutstanding += remaining;
+      chartPoints.push({ label: chartMonthLabel(m.date), usage, balance });
+    }
+    chartPoints.reverse(); // monthlyConsumptions arrives newest-first; charts read oldest→newest
+
+    // Deposits are a one-off amount held from the customer, separate from the
+    // recurring monthly bills above — any unpaid portion still counts toward
+    // what the customer owes overall.
+    for (const d of customer.deposits) {
+      const depositRow = depositRows[d.id] ?? depositRowFromRecord(d);
+      const depositAmount = parseNum(depositRow.amount, d.amount);
+      const depositPaid = parseNum(depositRow.paidAmount, d.paidAmount);
+      const depositRemaining = depositAmount - depositPaid;
+      if (depositRemaining > 0.001) totalOutstanding += depositRemaining;
+    }
+
+    hasDue = totalOutstanding > 0.001;
+    avgUsage =
+      customer.monthlyConsumptions.length > 0
+        ? totalUsage / customer.monthlyConsumptions.length
+        : 0;
+    avgBalance =
+      customer.monthlyConsumptions.length > 0
+        ? totalBilled / customer.monthlyConsumptions.length
+        : 0;
+  }
 
   function markPaid(id: string, balance: number) {
     const amt = Math.round(balance * 100) / 100;
@@ -853,136 +882,204 @@ export function CustomerDetailView() {
             alignItems: 'center',
           }}
         >
-          <button
-            className={styles.backBtn}
-            style={{ marginBottom: 0 }}
-            onClick={() => navigate(-1)}
-          >
-            <ArrowLeft size={15} />
-            Back
-          </button>
+          {!isReadOnly ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <button
+                className={styles.backBtn}
+                style={{ marginBottom: 0 }}
+                onClick={() => navigate(-1)}
+              >
+                <ArrowLeft size={15} />
+                Back
+              </button>
+
+              {navIds && (
+                <div className={styles.navGroup}>
+                  <button
+                    type="button"
+                    className={styles.navBtn}
+                    onClick={() => prevCustomerId && goToSibling(prevCustomerId)}
+                    disabled={!prevCustomerId}
+                    title="Previous customer"
+                  >
+                    <ChevronLeft size={15} />
+                  </button>
+                  {navIndex >= 0 && (
+                    <span className={styles.navPosition}>{navIndex + 1} of {navIds.length}</span>
+                  )}
+                  <button
+                    type="button"
+                    className={styles.navBtn}
+                    onClick={() => nextCustomerId && goToSibling(nextCustomerId)}
+                    disabled={!nextCustomerId}
+                    title="Next customer"
+                  >
+                    <ChevronRight size={15} />
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div />
+          )}
 
           <div style={{ display: 'flex', gap: '10px' }}>
-            <button
-              className={`${styles.headerActionBtn} ${styles.addBillBtn}`}
-              onClick={openAddBillModal}
-            >
-              <Plus size={15} />
-              Add Bill
-            </button>
-            <button
-              className={`${styles.headerActionBtn} ${styles.addDepositBtn}`}
-              onClick={openAddDepositModal}
-            >
-              <Wallet size={15} />
-              Add Deposit
-            </button>
-            <button
-              className={`${styles.headerActionBtn} ${styles.printBtn}`}
-              onClick={openPrintModal}
-              disabled={customer.monthlyConsumptions.length === 0}
-            >
-              <Printer size={15} />
-              Print Receipt
-            </button>
+            {!isReadOnly && (
+              <button
+                className={`${styles.headerActionBtn} ${styles.addBillBtn}`}
+                onClick={openAddBillModal}
+              >
+                <Plus size={15} />
+                Add Bill
+              </button>
+            )}
+            {!isReadOnly && (
+              <button
+                className={`${styles.headerActionBtn} ${styles.addDepositBtn}`}
+                onClick={openAddDepositModal}
+              >
+                <Wallet size={15} />
+                Add Deposit
+              </button>
+            )}
+            {!isReadOnly && (
+              <button
+                className={`${styles.headerActionBtn} ${styles.printBtn}`}
+                onClick={openPrintModal}
+                disabled={!customer || customer.monthlyConsumptions.length === 0}
+              >
+                <Printer size={15} />
+                Print Receipt
+              </button>
+            )}
           </div>
         </div>
 
-        <div className={styles.headerBody} style={{ marginTop: 14 }}>
-          <div className={styles.avatar}>{initials}</div>
-          <div className={styles.headerInfo}>
-            <h1 className={styles.name}>{fullName}</h1>
-            <div className={styles.badges}>
-              <span
-                className={`${styles.badge} ${customer.status === 'active' ? styles.badgeActive : styles.badgeInactive}`}
-              >
-                {customer.status}
-              </span>
-              <span
-                className={`${styles.badge} ${hasDue ? styles.badgeUnpaid : styles.badgePaid}`}
-              >
-                {hasDue ? 'Unpaid' : 'Paid'}
-              </span>
-              {isCounter && (
-                <span className={`${styles.badge} ${styles.badgeCounter}`}>
-                  <Gauge size={11} /> Counter
+        {customer && !loading ? (
+          <div className={styles.headerBody} style={{ marginTop: 14 }}>
+            <div className={styles.avatar}>{initials}</div>
+            <div className={styles.headerInfo}>
+              <h1 className={styles.name}>{fullName}</h1>
+              <div className={styles.badges}>
+                <span
+                  className={`${styles.badge} ${customer.status === 'active' ? styles.badgeActive : styles.badgeInactive}`}
+                >
+                  {customer.status}
                 </span>
-              )}
-              {customer.consumptionType.ThreePhase && (
-                <span className={`${styles.badge} ${styles.badgePhase}`}>
-                  3-Phase
+                <span
+                  className={`${styles.badge} ${hasDue ? styles.badgeUnpaid : styles.badgePaid}`}
+                >
+                  {hasDue ? 'Unpaid' : 'Paid'}
                 </span>
-              )}
+                {isCounter && (
+                  <span className={`${styles.badge} ${styles.badgeCounter}`}>
+                    <Gauge size={11} /> Counter
+                  </span>
+                )}
+                {customer.consumptionType.ThreePhase && (
+                  <span className={`${styles.badge} ${styles.badgePhase}`}>
+                    3-Phase
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* ── Info Strip ── */}
-      <div className={styles.infoStrip}>
-        <div className={styles.infoCard}>
-          <div className={styles.infoCardIcon}>
-            <Zap size={16} color="#facc15" />
-          </div>
-          <div>
-            <p className={styles.infoLabel}>Subscription Type</p>
-            <p className={styles.infoValue}>
-              {customer.consumptionType.description}
-            </p>
-          </div>
-        </div>
-
-        <div className={styles.infoCard}>
-          <div className={styles.infoCardIcon}>
-            <Gauge size={16} color="#60a5fa" />
-          </div>
-          <div>
-            <p className={styles.infoLabel}>Ampere</p>
-            <p className={styles.infoValue}>
-              {customer.consumptionType.Ampere} A
-            </p>
-          </div>
-        </div>
-
-        <div className={styles.infoCard}>
-          <div className={styles.infoCardIcon}>
-            <Building2 size={16} color="#a78bfa" />
-          </div>
-          <div>
-            <p className={styles.infoLabel}>Building / Floor</p>
-            <p className={styles.infoValue}>
-              {customer.buildingFloor
-                ? `${customer.buildingFloor.building.name} · Fl ${customer.buildingFloor.floorNumber} ${customer.buildingFloor.apartmentSide}`
-                : '—'}
-            </p>
-          </div>
-        </div>
-
-        <div className={styles.infoCard}>
-          <div className={styles.infoCardIcon}>
-            <Phone size={16} color="#34d399" />
-          </div>
-          <div>
-            <p className={styles.infoLabel}>Phone</p>
-            <p className={styles.infoValue}>{customer.phoneNumber ?? '—'}</p>
-          </div>
-        </div>
-
-        {notes && (
-          <div className={`${styles.infoCard} ${styles.infoCardWide}`}>
-            <div className={styles.infoCardIcon}>
-              <User size={16} color="#9ca3af" />
-            </div>
-            <div>
-              <p className={styles.infoLabel}>Notes</p>
-              <p className={styles.infoValue}>{notes}</p>
+        ) : (
+          <div className={styles.headerBody} style={{ marginTop: 14 }}>
+            <SkeletonBlock width={52} height={52} radius={12} />
+            <div className={styles.headerInfo}>
+              <SkeletonBlock width={200} height={22} />
+              <div style={{ display: 'flex', gap: 6 }}>
+                <SkeletonBlock width={60} height={20} radius={999} />
+                <SkeletonBlock width={60} height={20} radius={999} />
+                <SkeletonBlock width={72} height={20} radius={999} />
+              </div>
             </div>
           </div>
         )}
       </div>
 
+      {/* ── Info Strip ── */}
+      <div className={styles.infoStrip}>
+        {customer && !loading ? (
+          <>
+            <div className={styles.infoCard}>
+              <div className={styles.infoCardIcon}>
+                <Zap size={16} color="#facc15" />
+              </div>
+              <div>
+                <p className={styles.infoLabel}>Subscription Type</p>
+                <p className={styles.infoValue}>
+                  {customer.consumptionType.description}
+                </p>
+              </div>
+            </div>
+
+            <div className={styles.infoCard}>
+              <div className={styles.infoCardIcon}>
+                <Gauge size={16} color="#60a5fa" />
+              </div>
+              <div>
+                <p className={styles.infoLabel}>Ampere</p>
+                <p className={styles.infoValue}>
+                  {customer.consumptionType.Ampere} A
+                </p>
+              </div>
+            </div>
+
+            <div className={styles.infoCard}>
+              <div className={styles.infoCardIcon}>
+                <Building2 size={16} color="#a78bfa" />
+              </div>
+              <div>
+                <p className={styles.infoLabel}>Building / Floor</p>
+                <p className={styles.infoValue}>
+                  {customer.buildingFloor
+                    ? `${customer.buildingFloor.building.name} · Fl ${customer.buildingFloor.floorNumber} ${customer.buildingFloor.apartmentSide}`
+                    : '—'}
+                </p>
+              </div>
+            </div>
+
+            <div className={styles.infoCard}>
+              <div className={styles.infoCardIcon}>
+                <Phone size={16} color="#34d399" />
+              </div>
+              <div>
+                <p className={styles.infoLabel}>Phone</p>
+                <p className={styles.infoValue}>{customer.phoneNumber ?? '—'}</p>
+              </div>
+            </div>
+
+            {!isReadOnly && notes && (
+              <div className={`${styles.infoCard} ${styles.infoCardWide}`}>
+                <div className={styles.infoCardIcon}>
+                  <User size={16} color="#9ca3af" />
+                </div>
+                <div>
+                  <p className={styles.infoLabel}>Notes</p>
+                  <p className={styles.infoValue}>{notes}</p>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className={styles.infoCard}>
+              <SkeletonBlock width={34} height={34} radius={8} />
+              <div style={{ flex: 1 }}>
+                <SkeletonBlock width={90} height={10} />
+                <div style={{ marginTop: 6 }}><SkeletonBlock width={120} height={14} /></div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
       {/* ── Monthly History ── */}
       <div className={styles.content}>
+        {customer && !loading ? (
+        <>
         <div className={styles.sectionHeader}>
           <Calendar size={16} color="#60a5fa" />
           <h2 className={styles.sectionTitle}>Monthly Billing History</h2>
@@ -1044,15 +1141,17 @@ export function CustomerDetailView() {
                 ${formatMoney(totalOutstanding)}
               </p>
             </div>
-            <div className={styles.notesCard}>
-              <p className={styles.summaryLabel}>Notes</p>
-              <textarea
-                className={styles.notesTextarea}
-                value={notes}
-                placeholder="Add notes about this customer…"
-                onChange={(e) => setNotes(e.target.value)}
-              />
-            </div>
+            {!isReadOnly && (
+              <div className={styles.notesCard}>
+                <p className={styles.summaryLabel}>Notes</p>
+                <textarea
+                  className={styles.notesTextarea}
+                  value={notes}
+                  placeholder="Add notes about this customer…"
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -1165,6 +1264,7 @@ export function CustomerDetailView() {
                             className={styles.cellInput}
                             type="number"
                             value={depositRow.amount}
+                            readOnly={isReadOnly}
                             onChange={(e) =>
                               patchDepositRow(d.id, { amount: e.target.value })
                             }
@@ -1181,6 +1281,7 @@ export function CustomerDetailView() {
                             className={styles.cellInput}
                             type="number"
                             value={depositRow.paidAmount}
+                            readOnly={isReadOnly}
                             onChange={(e) =>
                               patchDepositRow(d.id, {
                                 paidAmount: e.target.value,
@@ -1206,6 +1307,7 @@ export function CustomerDetailView() {
                             type="date"
                             className={styles.dateInput}
                             value={depositRow.paidDate}
+                            readOnly={isReadOnly}
                             onChange={(e) =>
                               patchDepositRow(d.id, {
                                 paidDate: e.target.value,
@@ -1230,7 +1332,7 @@ export function CustomerDetailView() {
                             >
                               ${formatMoney(Math.max(0, remaining))}
                             </span>
-                            {remaining > 0.001 && (
+                            {!isReadOnly && remaining > 0.001 && (
                               <button
                                 type="button"
                                 className={styles.markPaidBtn}
@@ -1246,14 +1348,16 @@ export function CustomerDetailView() {
                         <td className={styles.iconCell}>—</td>
 
                         <td className={styles.iconCell}>
-                          <button
-                            type="button"
-                            className={styles.deleteDepositBtn}
-                            onClick={() => void removeDeposit(d.id)}
-                            title="Delete deposit"
-                          >
-                            <Trash2 size={13} />
-                          </button>
+                          {!isReadOnly && (
+                            <button
+                              type="button"
+                              className={styles.deleteDepositBtn}
+                              onClick={() => void removeDeposit(d.id)}
+                              title="Delete deposit"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );
@@ -1307,6 +1411,7 @@ export function CustomerDetailView() {
                               className={styles.cellInput}
                               type="number"
                               value={row.previousCounter}
+                              readOnly={isReadOnly}
                               onChange={(e) =>
                                 patchRow(m.id, {
                                   previousCounter: e.target.value,
@@ -1327,6 +1432,7 @@ export function CustomerDetailView() {
                               className={styles.cellInput}
                               type="number"
                               value={row.currentCounter}
+                              readOnly={isReadOnly}
                               onChange={(e) =>
                                 patchRow(m.id, {
                                   currentCounter: e.target.value,
@@ -1366,6 +1472,7 @@ export function CustomerDetailView() {
                             className={styles.cellInput}
                             type="number"
                             value={row.monthlyFee}
+                            readOnly={isReadOnly}
                             onChange={(e) =>
                               patchRow(m.id, { monthlyFee: e.target.value })
                             }
@@ -1381,6 +1488,7 @@ export function CustomerDetailView() {
                           <input
                             className={`${styles.cellInput} ${styles.balanceVal} ${override !== null ? styles.balanceOverridden : ''}`}
                             type="number"
+                            readOnly={isReadOnly}
                             title={
                               override !== null
                                 ? 'Manual override — differs from the usage/fee calculation'
@@ -1420,6 +1528,7 @@ export function CustomerDetailView() {
                             className={styles.cellInput}
                             type="number"
                             value={row.amountPaid}
+                            readOnly={isReadOnly}
                             onChange={(e) =>
                               patchRow(m.id, { amountPaid: e.target.value })
                             }
@@ -1441,6 +1550,7 @@ export function CustomerDetailView() {
                             type="date"
                             className={styles.dateInput}
                             value={row.paidDate}
+                            readOnly={isReadOnly}
                             onChange={(e) =>
                               patchRow(m.id, { paidDate: e.target.value })
                             }
@@ -1463,7 +1573,7 @@ export function CustomerDetailView() {
                             >
                               ${formatMoney(Math.max(0, remaining))}
                             </span>
-                            {remaining > 0.001 && !row.closedBalance && (
+                            {!isReadOnly && remaining > 0.001 && !row.closedBalance && (
                               <button
                                 type="button"
                                 className={styles.markPaidBtn}
@@ -1481,6 +1591,7 @@ export function CustomerDetailView() {
                             type="checkbox"
                             className={styles.cellCheck}
                             checked={row.isCut}
+                            disabled={isReadOnly}
                             onChange={(e) => {
                               patchRow(m.id, { isCut: e.target.checked });
                               void save(m.id, { isCut: e.target.checked });
@@ -1494,6 +1605,7 @@ export function CustomerDetailView() {
                             type="checkbox"
                             className={styles.cellCheck}
                             checked={row.closedBalance}
+                            disabled={isReadOnly}
                             onChange={(e) => {
                               patchRow(m.id, {
                                 closedBalance: e.target.checked,
@@ -1513,14 +1625,40 @@ export function CustomerDetailView() {
             </div>
           ))}
 
-        <p className={styles.formulaNote}>
-          {isCounter
-            ? 'Balance = (Current Counter − Previous Counter) × kWh Price + Monthly Fee'
-            : 'Balance = Monthly Fee (Ampere × Price per Amp set at billing time)'}
-          {
-            ' — edit the Balance cell directly to set a special amount (highlighted in violet).'
-          }
-        </p>
+        {!isReadOnly && (
+          <p className={styles.formulaNote}>
+            {isCounter
+              ? 'Balance = (Current Counter − Previous Counter) × kWh Price + Monthly Fee'
+              : 'Balance = Monthly Fee (Ampere × Price per Amp set at billing time)'}
+            {
+              ' — edit the Balance cell directly to set a special amount (highlighted in violet).'
+            }
+          </p>
+        )}
+        </>
+        ) : (
+          <>
+            <div className={styles.sectionHeader}>
+              <Calendar size={16} color="#60a5fa" />
+              <h2 className={styles.sectionTitle}>Monthly Billing History</h2>
+            </div>
+            <div className={styles.summaryStrip}>
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className={styles.summaryCard}>
+                  <SkeletonBlock width={100} height={10} />
+                  <div style={{ marginTop: 6 }}><SkeletonBlock width={80} height={18} /></div>
+                </div>
+              ))}
+            </div>
+            <div className={styles.tableWrap}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '16px 12px' }}>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <SkeletonBlock key={i} width="100%" height={32} />
+                ))}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

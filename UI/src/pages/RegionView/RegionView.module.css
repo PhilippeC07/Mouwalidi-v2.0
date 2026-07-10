@@ -1,0 +1,194 @@
+.page {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--bg-1);
+  display: flex;
+  flex-direction: column;
+}
+
+.centerState { flex: 1; display: flex; align-items: center; justify-content: center; }
+.stateText { color: var(--tx-4); font-size: 0.9rem; }
+.stateErr  { color: #f87171;    font-size: 0.9rem; }
+
+/* ── Header ── */
+.header {
+  background: var(--bg-0);
+  border-bottom: 1px solid var(--br);
+  padding: 20px 24px;
+  flex-shrink: 0;
+}
+
+.headerTop { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+
+.titleRow { display: flex; align-items: center; gap: 10px; }
+.titleIcon { color: #60a5fa; flex-shrink: 0; }
+.title { color: var(--tx-0); font-size: 1.3rem; font-weight: 700; margin: 0; }
+
+.meta { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 10px; }
+.metaItem { display: flex; align-items: center; gap: 6px; color: var(--tx-4); font-size: 0.82rem; }
+
+.whatsappBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  white-space: nowrap;
+  background-color: rgba(52, 211, 153, 0.1);
+  color: #34d399;
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  transition: background-color 0.15s ease;
+}
+.whatsappBtn:hover { background-color: rgba(52, 211, 153, 0.2); }
+.whatsappBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Content ── */
+.content { flex: 1; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+.sectionTitle { color: var(--tx-1); font-size: 0.95rem; font-weight: 600; margin: 0; }
+.empty { color: var(--tx-4); font-size: 0.875rem; }
+
+.groupGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.groupCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--bg-0);
+  border: 1px solid var(--br);
+  border-radius: 8px;
+  text-decoration: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.groupCard:hover { border-color: var(--bg-4); background: var(--bg-2); }
+
+.groupCardIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--bg-2);
+  border: 1px solid var(--br);
+  color: #60a5fa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.groupCardName { color: var(--tx-1); font-size: 0.88rem; font-weight: 600; margin: 0; }
+.groupCardMeta { color: var(--tx-4); font-size: 0.76rem; margin: 2px 0 0; }
+
+/* ── KPI strip ── */
+.kpiStrip { display: flex; flex-wrap: wrap; gap: 12px; }
+
+.kpiCard {
+  flex: 1 1 160px;
+  padding: 14px 18px;
+  background: var(--bg-0);
+  border: 1px solid var(--br);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kpiLabel {
+  color: var(--tx-4);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+
+.kpiValue { font-size: 1.2rem; font-weight: 700; color: var(--tx-1); margin: 0; font-variant-numeric: tabular-nums; }
+.kpiBlue   { color: #60a5fa; }
+.kpiGreen  { color: #34d399; }
+.kpiRed    { color: #f87171; }
+.kpiYellow { color: #fbbf24; }
+
+/* ── Charts ── */
+.chartsRow { display: flex; gap: 16px; flex-wrap: wrap; }
+
+.chartCard {
+  background: var(--bg-0);
+  border: 1px solid var(--br);
+  border-radius: 8px;
+  padding: 14px 18px 6px;
+}
+
+.chartCardTitle { color: var(--tx-1); font-size: 0.85rem; font-weight: 600; margin: 0 0 8px; }
+
+/* ── Billing-by-group table ── */
+.tableWrap {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid var(--br);
+}
+
+.table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+
+.table th {
+  text-align: left;
+  padding: 8px 12px;
+  background: var(--bg-3);
+  color: var(--tx-4);
+  font-weight: 500;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.table th.numCell { text-align: right; }
+
+.table td {
+  padding: 8px 12px;
+  border-top: 1px solid var(--br);
+  color: var(--tx-2);
+  background: var(--bg-0);
+  white-space: nowrap;
+}
+
+.numCell { text-align: right; font-variant-numeric: tabular-nums; }
+.blueText  { color: #60a5fa; }
+.greenText { color: #34d399; }
+.redText   { color: #f87171; font-weight: 600; }
+
+/* ── Send WhatsApp modal ── */
+.modalHint { color: var(--tx-4); font-size: 0.8rem; margin: 0 0 12px; line-height: 1.4; }
+
+.messageTextarea {
+  width: 100%;
+  min-height: 100px;
+  background: var(--bg-2);
+  border: 1px solid var(--br);
+  border-radius: 6px;
+  color: var(--tx-1);
+  font-family: inherit;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  padding: 8px 10px;
+  outline: none;
+  resize: vertical;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+.messageTextarea:focus { border-color: #3b82f6; }
+
+.resultSummary { display: flex; gap: 20px; font-size: 0.85rem; color: var(--tx-2); }
+.resultSent { color: #34d399; font-size: 1.2rem; }
+.resultFailed { color: #f87171; font-size: 1.2rem; }
+
+.errorList {
+  margin-top: 12px;
+  max-height: 160px;
+  overflow-y: auto;
+  border-top: 1px solid var(--br);
+  padding-top: 8px;
+}
+.errorRow { color: #f87171; font-size: 0.76rem; margin: 4px 0; }

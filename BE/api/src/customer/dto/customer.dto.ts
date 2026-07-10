@@ -45,6 +45,12 @@ export class CreateCustomerDto {
 
   @ApiProperty({ example: 'Left' })
   apartmentSide!: string;
+
+  @ApiPropertyOptional({ description: 'Provide together with accountPassword to also create a login account (role CUSTOMER) for this customer.' })
+  accountEmail?: string;
+
+  @ApiPropertyOptional({ description: 'Minimum 8 characters. Provide together with accountEmail to also create a login account for this customer.' })
+  accountPassword?: string;
 }
 
 export class CreateConsumptionTypeDto {
