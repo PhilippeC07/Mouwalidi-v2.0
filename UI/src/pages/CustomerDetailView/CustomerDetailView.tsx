@@ -16,6 +16,8 @@ import {
   X,
   Trash2,
   Wallet,
+  CreditCard,
+  Smartphone,
 } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useCustomerDetails } from '../../hooks/useCustomerDetails';
@@ -40,6 +42,8 @@ import {
   type ReceiptData,
   type CustomerMonthlyRate,
 } from '../../api/billing/billing.api';
+import { createCustomerPaymentCheckout } from '../../api/stripe/stripe.api';
+import { getCustomerPaymentRecipient, submitCustomerPaymentClaim } from '../../api/whish/whish.api';
 import { formatMoney } from '../../utils/format';
 import { ReceiptPrintSheet } from '../../components/receipts/ReceiptPrintSheet';
 import { SimpleLineChart } from '../../app/components/SimpleLineChart';
@@ -93,6 +97,76 @@ export function CustomerDetailView() {
     error,
     refetch,
   } = useCustomerDetails(customerId);
+
+  const [payLoading, setPayLoading] = useState(false);
+  const [payError, setPayError] = useState<string | null>(null);
+  const [paymentBanner, setPaymentBanner] = useState<'success' | 'cancel' | null>(null);
+
+  const [payDialogOpen, setPayDialogOpen] = useState(false);
+  const [payStep, setPayStep] = useState<'choice' | 'whish'>('choice');
+  const [whishPhoneNumber, setWhishPhoneNumber] = useState<string | null>(null);
+  const [whishRecipientLoading, setWhishRecipientLoading] = useState(false);
+  const [whishReferenceNumber, setWhishReferenceNumber] = useState('');
+  const [whishSubmitting, setWhishSubmitting] = useState(false);
+  const [whishSubmitted, setWhishSubmitted] = useState(false);
+  const [whishError, setWhishError] = useState<string | null>(null);
+
+  function openPayDialog() {
+    setPayStep('choice');
+    setWhishError(null);
+    setWhishSubmitted(false);
+    setWhishReferenceNumber('');
+    setPayDialogOpen(true);
+  }
+
+  function openWhishStep() {
+    setPayStep('whish');
+    setWhishRecipientLoading(true);
+    getCustomerPaymentRecipient()
+      .then((r) => setWhishPhoneNumber(r.phoneNumber))
+      .catch(() => setWhishPhoneNumber(null))
+      .finally(() => setWhishRecipientLoading(false));
+  }
+
+  async function handleWhishSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setWhishSubmitting(true);
+    setWhishError(null);
+    try {
+      await submitCustomerPaymentClaim(whishReferenceNumber.trim());
+      setWhishSubmitted(true);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setWhishError(msg ?? 'Failed to submit payment reference.');
+    } finally {
+      setWhishSubmitting(false);
+    }
+  }
+
+  // Handle the return from Stripe Checkout (?payment=success|cancel), then
+  // strip the query param so a page refresh doesn't re-trigger the banner.
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const payment = params.get('payment');
+    if (payment !== 'success' && payment !== 'cancel') return;
+    setPaymentBanner(payment);
+    if (payment === 'success') void refetch();
+    navigate(location.pathname, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function handlePayNow() {
+    setPayLoading(true);
+    setPayError(null);
+    try {
+      const { url } = await createCustomerPaymentCheckout();
+      window.location.href = url;
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setPayError(msg ?? 'Failed to start payment.');
+      setPayLoading(false);
+    }
+  }
 
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -873,6 +947,105 @@ export function CustomerDetailView() {
         </Dialog.Portal>
       </Dialog.Root>
 
+      {/* Pay bill — choose Stripe (card) or Whish Money */}
+      <Dialog.Root open={payDialogOpen} onOpenChange={setPayDialogOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className={dialogStyles.dialogOverlay} />
+          <Dialog.Content className={dialogStyles.dialogContent} aria-describedby={undefined}>
+            <div className={dialogStyles.dialogHeader}>
+              <Dialog.Title className={dialogStyles.dialogTitle}>
+                {payStep === 'choice' ? 'Pay Your Bill' : 'Pay with Whish Money'}
+              </Dialog.Title>
+              <Dialog.Close className={dialogStyles.dialogCloseBtn}>
+                <X size={18} />
+              </Dialog.Close>
+            </div>
+
+            {payStep === 'choice' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--tx-3)' }}>
+                  Amount due: <strong>{formatMoney(totalOutstanding)}</strong>
+                </p>
+                <button
+                  type="button"
+                  className={dialogStyles.btnSubmit}
+                  onClick={handlePayNow}
+                  disabled={payLoading}
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}
+                >
+                  <CreditCard size={15} />
+                  {payLoading ? 'Redirecting…' : 'Pay with Card'}
+                </button>
+                <button
+                  type="button"
+                  className={dialogStyles.btnCancel}
+                  onClick={openWhishStep}
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}
+                >
+                  <Smartphone size={15} />
+                  Pay with Whish Money
+                </button>
+                {payError && (
+                  <p style={{ color: '#f87171', fontSize: '0.75rem', margin: 0 }}>{payError}</p>
+                )}
+              </div>
+            )}
+
+            {payStep === 'whish' && !whishSubmitted && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {whishRecipientLoading ? (
+                  <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--tx-3)' }}>Loading…</p>
+                ) : whishPhoneNumber ? (
+                  <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--tx-3)' }}>
+                    Send <strong>{formatMoney(totalOutstanding)}</strong> via the Whish app to{' '}
+                    <strong>{whishPhoneNumber}</strong>, then enter your reference number below.
+                  </p>
+                ) : (
+                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#f87171' }}>
+                    The admin managing your account hasn't published a Whish Money number yet.
+                  </p>
+                )}
+
+                {whishPhoneNumber && (
+                  <form onSubmit={handleWhishSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div className={dialogStyles.formField}>
+                      <label className={dialogStyles.formLabel}>Whish Reference Number</label>
+                      <input
+                        className={dialogStyles.formInput}
+                        value={whishReferenceNumber}
+                        onChange={(e) => setWhishReferenceNumber(e.target.value)}
+                        required
+                      />
+                    </div>
+                    {whishError && (
+                      <p style={{ color: '#f87171', fontSize: '0.75rem', margin: 0 }}>{whishError}</p>
+                    )}
+                    <div className={dialogStyles.formActions}>
+                      <button type="button" className={dialogStyles.btnCancel} onClick={() => setPayStep('choice')}>
+                        Back
+                      </button>
+                      <button
+                        type="submit"
+                        className={dialogStyles.btnSubmit}
+                        disabled={whishSubmitting || !whishReferenceNumber.trim()}
+                      >
+                        {whishSubmitting ? 'Submitting…' : 'Submit'}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            )}
+
+            {payStep === 'whish' && whishSubmitted && (
+              <p style={{ margin: 0, fontSize: '0.85rem', color: '#34d399' }}>
+                Submitted — awaiting confirmation from your admin.
+              </p>
+            )}
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
       {/* ── Header ── */}
       <div className={styles.header}>
         <div
@@ -952,8 +1125,28 @@ export function CustomerDetailView() {
                 Print Receipt
               </button>
             )}
+            {isReadOnly && hasDue && (
+              <button
+                className={`${styles.headerActionBtn} ${styles.addBillBtn}`}
+                onClick={openPayDialog}
+                disabled={payLoading}
+              >
+                <CreditCard size={15} />
+                {`Pay ${formatMoney(totalOutstanding)}`}
+              </button>
+            )}
           </div>
         </div>
+
+        {paymentBanner === 'success' && (
+          <p style={{ color: '#34d399', fontSize: '0.82rem', margin: '10px 0 0' }}>Payment received — thank you!</p>
+        )}
+        {paymentBanner === 'cancel' && (
+          <p style={{ color: 'var(--tx-4)', fontSize: '0.82rem', margin: '10px 0 0' }}>Payment cancelled.</p>
+        )}
+        {payError && (
+          <p style={{ color: '#f87171', fontSize: '0.82rem', margin: '10px 0 0' }}>{payError}</p>
+        )}
 
         {customer && !loading ? (
           <div className={styles.headerBody} style={{ marginTop: 14 }}>

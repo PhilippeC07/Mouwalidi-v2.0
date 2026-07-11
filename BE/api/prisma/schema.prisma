@@ -30,6 +30,21 @@ model User {
   customerId   String?   @unique @db.Uuid
   customer     Customer? @relation(fields: [customerId], references: [id])
   ownedRegions Region[]  @relation("RegionOwner")
+
+  // Subscription billing (ADMIN -> SUPERADMIN, this platform's own revenue)
+  stripeCustomerId             String?   @unique
+  stripeSubscriptionId         String?   @unique
+  subscriptionStatus           String?
+  subscriptionCurrentPeriodEnd DateTime?
+
+  // Stripe Connect (CUSTOMER -> owning admin/superadmin destination charges)
+  stripeConnectAccountId String?  @unique
+  stripeConnectOnboarded Boolean  @default(false)
+
+  // Whish Money (manual confirmation flow) — this user's own number, shown
+  // to whoever needs to pay them.
+  whishPhoneNumber          String?
+  subscriptionPaymentClaims SubscriptionPaymentClaim[]
 }
 
 model Region {
@@ -115,6 +130,38 @@ model Customer {
   buildingFloor       BuildingFloor?
   deposits            Deposit[]
   user                User?
+  payments            Payment[]
+}
+
+model Payment {
+  id                      String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customerId              String    @db.Uuid
+  customer                Customer  @relation(fields: [customerId], references: [id])
+  adminUserId             String    @db.Uuid
+  amount                  Float
+  currency                String    @default("usd")
+  status                  String    @default("pending")
+  stripeCheckoutSessionId String    @unique
+  stripePaymentIntentId   String?   @unique
+  snapshot                Json
+  createdAt               DateTime  @default(now())
+  paidAt                  DateTime?
+
+  // 'stripe' | 'whish'. Whish claims use status 'pending_review' | 'succeeded' | 'rejected'.
+  method          String  @default("stripe")
+  referenceNumber String?
+}
+
+model SubscriptionPaymentClaim {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  adminUserId     String    @db.Uuid
+  admin           User      @relation(fields: [adminUserId], references: [id])
+  amountClaimed   Float
+  referenceNumber String
+  note            String?
+  status          String    @default("pending") // 'pending' | 'approved' | 'rejected'
+  createdAt       DateTime  @default(now())
+  reviewedAt      DateTime?
 }
 
 model Deposit {

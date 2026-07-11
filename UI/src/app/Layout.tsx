@@ -21,6 +21,11 @@ export function Layout() {
     if (location.pathname !== ownRoute) return <Navigate to={ownRoute} replace />;
   }
 
+  const isLockedAdmin = user.role === 'ADMIN' && !['active', 'trialing'].includes(user.subscriptionStatus ?? '');
+  if (isLockedAdmin && location.pathname !== '/billing-locked') {
+    return <Navigate to="/billing-locked" replace />;
+  }
+
   const body = (
     <div className={styles.root}>
       {sidebarOpen && (
@@ -54,7 +59,7 @@ export function Layout() {
   return (
     <ThemeProvider>
     <ReceiptTemplateProvider>
-      {user.role === 'CUSTOMER' ? body : <RegionsProvider>{body}</RegionsProvider>}
+      {(user.role === 'CUSTOMER' || isLockedAdmin) ? body : <RegionsProvider>{body}</RegionsProvider>}
     </ReceiptTemplateProvider>
     </ThemeProvider>
   );

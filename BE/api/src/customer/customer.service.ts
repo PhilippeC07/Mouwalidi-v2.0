@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma.service.js';
+import { StripeService } from '../stripe/stripe.service.js';
 import {
   ConsumptionStatusResponseDto,
   ConsumptionTypeResponseDto,
@@ -25,7 +26,19 @@ const SALT_ROUNDS = 12;
 
 @Injectable()
 export class CustomerService {
-  constructor(private readonly db: PrismaService) {}
+  constructor(
+    private readonly db: PrismaService,
+    private readonly stripeService: StripeService,
+  ) {}
+
+  /** The admin/superadmin whose subscription is billed per-customer for this consumptionType's region. */
+  private async getOwnerIdForConsumptionType(consumptionTypeId: string): Promise<string | null> {
+    const consumptionType = await this.db.consumptionType.findUnique({
+      where: { id: consumptionTypeId },
+      select: { generatorGroup: { select: { region: { select: { ownerId: true } } } } },
+    });
+    return consumptionType?.generatorGroup.region.ownerId ?? null;
+  }
 
   async createCustomer(dto: CreateCustomerDto, user: RequestingUser) {
     const { buildingId, floorNumber, apartmentSide, accountEmail, accountPassword, ...customerData } = dto;
@@ -45,7 +58,7 @@ export class CustomerService {
       accountPasswordHash = await bcrypt.hash(accountPassword, SALT_ROUNDS);
     }
 
-    return this.db.$transaction(async (tx) => {
+    const customer = await this.db.$transaction(async (tx) => {
       const customer = await tx.customer.create({ data: customerData });
       await tx.buildingFloor.create({
         data: { floorNumber, apartmentSide, buildingId, customerId: customer.id },
@@ -63,6 +76,11 @@ export class CustomerService {
       }
       return customer;
     });
+
+    const ownerId = await this.getOwnerIdForConsumptionType(dto.consumptionTypeId);
+    if (ownerId) await this.stripeService.syncSubscriptionQuantity(ownerId);
+
+    return customer;
   }
 
   async getConsumptionStatuses(): Promise<ConsumptionStatusResponseDto[]> {
@@ -103,12 +121,19 @@ export class CustomerService {
 
   async deleteCustomer(id: string, user: RequestingUser) {
     await assertCustomerOwned(this.db, user, id);
-    return this.db.$transaction(async (tx) => {
+    const customer = await this.db.customer.findUnique({ where: { id }, select: { consumptionTypeId: true } });
+    const ownerId = customer ? await this.getOwnerIdForConsumptionType(customer.consumptionTypeId) : null;
+
+    const deleted = await this.db.$transaction(async (tx) => {
       await tx.monthlyConsumption.deleteMany({ where: { customerId: id } });
       await tx.deposit.deleteMany({ where: { customerId: id } });
       await tx.buildingFloor.deleteMany({ where: { customerId: id } });
       return tx.customer.delete({ where: { id } });
     });
+
+    if (ownerId) await this.stripeService.syncSubscriptionQuantity(ownerId);
+
+    return deleted;
   }
 
   async updateCustomer(id: string, dto: UpdateCustomerDto, user: RequestingUser) {

@@ -11,6 +11,7 @@ import { AccountingSummary } from '../pages/AccountingView/AccountingSummary.tsx
 import { AccountingReceivables } from '../pages/AccountingView/AccountingReceivables.tsx';
 import { AccountingPayments } from '../pages/AccountingView/AccountingPayments.tsx';
 import { LoginView } from '../pages/LoginView/LoginView.tsx';
+import { BillingLockedView } from '../pages/BillingLockedView/BillingLockedView.tsx';
 import { AuthProvider } from '../context/AuthContext.tsx';
 
 export default function App() {
@@ -27,6 +28,7 @@ export default function App() {
             <Route path="generator-groups/:groupId/manage" element={<GroupManagementView />} />
             <Route path="settings" element={<SettingsView />} />
             <Route path="customers/:customerId" element={<CustomerDetailView />} />
+            <Route path="billing-locked" element={<BillingLockedView />} />
             <Route path="accounting/summary" element={<AccountingSummary />} />
             <Route path="accounting/receivables" element={<AccountingReceivables />} />
             <Route path="accounting/payments" element={<AccountingPayments />} />

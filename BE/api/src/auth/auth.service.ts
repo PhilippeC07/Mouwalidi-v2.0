@@ -7,7 +7,16 @@ import { Role } from '../generated/prisma/client.js';
 import { assertCustomerOwned, customerWhere, isSuperAdmin, type RequestingUser } from './ownership.util.js';
 
 const SALT_ROUNDS = 12;
-const USER_SELECT = { id: true, email: true, name: true, createdAt: true, role: true, customerId: true } as const;
+const USER_SELECT = {
+  id: true,
+  email: true,
+  name: true,
+  createdAt: true,
+  role: true,
+  customerId: true,
+  subscriptionStatus: true,
+  stripeConnectOnboarded: true,
+} as const;
 
 @Injectable()
 export class AuthService {
@@ -38,6 +47,8 @@ export class AuthService {
         createdAt: user.createdAt,
         role: user.role,
         customerId: user.customerId,
+        subscriptionStatus: user.subscriptionStatus,
+        stripeConnectOnboarded: user.stripeConnectOnboarded,
       },
     };
   }

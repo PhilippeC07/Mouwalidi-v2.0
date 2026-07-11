@@ -35,7 +35,8 @@
     "pg": "^8.20.0",
     "playfab-sdk": "^2.185.251107",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "stripe": "^22.3.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",

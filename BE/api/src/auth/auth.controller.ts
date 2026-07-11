@@ -4,6 +4,7 @@ import { AuthService } from './auth.service.js';
 import { LoginDto, LoginResponseDto, RegisterDto, UserResponseDto } from './dto/auth.dto.js';
 import { Public } from './public.decorator.js';
 import { Roles } from './roles.decorator.js';
+import { AllowUnpaid } from './allow-unpaid.decorator.js';
 import { Role } from '../generated/prisma/client.js';
 import { CurrentUser, type AuthenticatedUser } from './current-user.decorator.js';
 
@@ -35,6 +36,7 @@ export class AuthController {
   }
 
   @Get('me')
+  @AllowUnpaid()
   getMe(@CurrentUser() user: AuthenticatedUser): Promise<UserResponseDto> {
     return this.authService.getMe(user.id);
   }

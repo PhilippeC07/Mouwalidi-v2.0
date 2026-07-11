@@ -9,6 +9,8 @@ export interface AuthUser {
   createdAt: string;
   role: Role;
   customerId: string | null;
+  subscriptionStatus: string | null;
+  stripeConnectOnboarded: boolean;
 }
 
 export interface LoginResult {

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   MapPin, FolderTree, ChevronDown, ChevronRight, Zap, Gauge,
   Plus, CheckCircle, AlertCircle, Loader, Layers,
-  PlugZap, Pencil, Trash2, UserPlus, Users,
+  PlugZap, Pencil, Trash2, UserPlus, Users, Smartphone, XCircle,
 } from 'lucide-react';
 import { useRegions, type RegionGroupModel, type RegionModel } from '../../hooks/useGetRegions';
 import { useMonthlyBillings } from '../../hooks/useMonthlyBillings';
@@ -14,6 +14,30 @@ import {
 } from '../../api/generator/generator.api';
 import { getUsers, registerAccount, type AuthUser } from '../../api/auth/auth.api';
 import { getCustomers, type CustomerListItem } from '../../api/customer/customer.api';
+import {
+  createSubscriptionCheckout,
+  createBillingPortalSession,
+  getSubscriptionStatus,
+  createConnectOnboardingLink,
+  getConnectStatus,
+  type SubscriptionStatus,
+  type ConnectStatus,
+} from '../../api/stripe/stripe.api';
+import {
+  getSubscriptionRecipient,
+  submitSubscriptionClaim,
+  getMySubscriptionClaims,
+  getPendingSubscriptionClaims,
+  approveSubscriptionClaim,
+  rejectSubscriptionClaim,
+  listCustomerPaymentClaims,
+  approveCustomerPaymentClaim,
+  rejectCustomerPaymentClaim,
+  setWhishPhoneNumber,
+  type SubscriptionClaim,
+  type CustomerPaymentClaim,
+  type WhishRecipient,
+} from '../../api/whish/whish.api';
 import { useRegionsContext } from '../../context/RegionsContext';
 import { useAuth } from '../../context/AuthContext';
 import { formatMoney } from '../../utils/format';
@@ -1112,15 +1136,395 @@ function AccountsList({ refreshKey }: { refreshKey: number }) {
 }
 
 /* ─────────────────────────────────────────────────
+   Platform Billing — ADMIN's own subscription to the platform, plus
+   Stripe Connect onboarding (ADMIN and SUPERADMIN, so a SUPERADMIN who owns
+   regions directly can still receive their own customers' payments).
+───────────────────────────────────────────────── */
+function SubscriptionCard() {
+  const [status, setStatus] = useState<SubscriptionStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getSubscriptionStatus()
+      .then((data) => { if (!cancelled) setStatus(data); })
+      .catch((e: unknown) => { if (!cancelled) setErr(apiErr(e)); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  async function handleAction() {
+    setActionLoading(true); setErr(null);
+    try {
+      const needsNewCheckout = !status?.subscriptionStatus || status.subscriptionStatus === 'canceled';
+      const { url } = needsNewCheckout ? await createSubscriptionCheckout() : await createBillingPortalSession();
+      window.location.href = url;
+    } catch (e: unknown) {
+      setErr(apiErr(e));
+      setActionLoading(false);
+    }
+  }
+
+  const needsNewCheckout = !status?.subscriptionStatus || status.subscriptionStatus === 'canceled';
+
+  return (
+    <div className={styles.infraCard}>
+      <div className={styles.infraCardHeader}>
+        <CheckCircle size={14} style={{ color: '#60a5fa' }} />
+        <span className={styles.infraCardTitle}>Subscription</span>
+      </div>
+      {loading ? (
+        <p className={styles.manageEmpty}>Loading…</p>
+      ) : (
+        <div className={styles.infraForm}>
+          <p className={styles.sectionDesc} style={{ margin: 0 }}>
+            Status: <strong>{status?.subscriptionStatus ?? 'not subscribed'}</strong>
+            {status?.currentPeriodEnd && !needsNewCheckout && (
+              <> — renews {new Date(status.currentPeriodEnd).toLocaleDateString()}</>
+            )}
+          </p>
+          {status && (
+            <p className={styles.sectionDesc} style={{ margin: 0 }}>
+              {status.customerCount} customer{status.customerCount !== 1 ? 's' : ''} × ${status.pricePerCustomerUsd.toFixed(2)} = <strong>${status.estimatedMonthlyUsd.toFixed(2)}/month</strong>
+            </p>
+          )}
+          {err && <div className={styles.infraError}><AlertCircle size={13} /> {err}</div>}
+          <button className={styles.infraBtn} onClick={handleAction} disabled={actionLoading}>
+            {actionLoading ? <Loader size={13} className={styles.spin} /> : <CheckCircle size={13} />}
+            {needsNewCheckout ? 'Subscribe' : 'Manage subscription'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ConnectCard() {
+  const [status, setStatus] = useState<ConnectStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getConnectStatus()
+      .then((data) => { if (!cancelled) setStatus(data); })
+      .catch((e: unknown) => { if (!cancelled) setErr(apiErr(e)); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  async function handleConnect() {
+    setActionLoading(true); setErr(null);
+    try {
+      const { url } = await createConnectOnboardingLink();
+      window.location.href = url;
+    } catch (e: unknown) {
+      setErr(apiErr(e));
+      setActionLoading(false);
+    }
+  }
+
+  return (
+    <div className={styles.infraCard}>
+      <div className={styles.infraCardHeader}>
+        <PlugZap size={14} style={{ color: '#34d399' }} />
+        <span className={styles.infraCardTitle}>Receive customer payments</span>
+      </div>
+      {loading ? (
+        <p className={styles.manageEmpty}>Loading…</p>
+      ) : (
+        <div className={styles.infraForm}>
+          <p className={styles.sectionDesc} style={{ margin: 0 }}>
+            {status?.onboarded
+              ? 'Connected — your customers can pay their bills online, sent directly to your Stripe account.'
+              : 'Connect a Stripe account so your customers can pay their electricity bills online.'}
+          </p>
+          {err && <div className={styles.infraError}><AlertCircle size={13} /> {err}</div>}
+          {!status?.onboarded && (
+            <button className={styles.infraBtn} onClick={handleConnect} disabled={actionLoading}>
+              {actionLoading ? <Loader size={13} className={styles.spin} /> : <PlugZap size={13} />}
+              Connect with Stripe
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────
+   Whish Money — manual payment confirmation (ADMIN + SUPERADMIN publish
+   their own number; ADMIN can pay their subscription via Whish; both
+   review incoming Whish claims for customers they own).
+───────────────────────────────────────────────── */
+function WhishPhoneNumberCard() {
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [ok, setOk] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitting(true); setOk(false); setErr(null);
+    try {
+      await setWhishPhoneNumber(phoneNumber.trim());
+      setOk(true);
+      setTimeout(() => setOk(false), 3000);
+    } catch (e: unknown) {
+      setErr(apiErr(e));
+    } finally { setSubmitting(false); }
+  }
+
+  return (
+    <div className={styles.infraCard}>
+      <div className={styles.infraCardHeader}>
+        <Smartphone size={14} className={styles.infraIcon} style={{ color: '#34d399' }} />
+        <span className={styles.infraCardTitle}>Whish Money Number</span>
+      </div>
+      <form onSubmit={handleSubmit} className={styles.infraForm}>
+        <p className={styles.sectionDesc} style={{ margin: 0 }}>
+          Shown to whoever needs to pay you (your customers, or the superadmin for your subscription).
+        </p>
+        <div className={styles.infraField}>
+          <label className={styles.infraLabel}>Whish Phone Number</label>
+          <input
+            className={styles.infraInput}
+            value={phoneNumber}
+            onChange={(e) => setPhoneNumber(e.target.value)}
+            placeholder="+961 70 000 000"
+            required
+          />
+        </div>
+        {ok && <div className={styles.infraSuccess}><CheckCircle size={13} /> Saved.</div>}
+        {err && <div className={styles.infraError}><AlertCircle size={13} /> {err}</div>}
+        <button className={styles.infraBtn} disabled={submitting || !phoneNumber.trim()}>
+          {submitting ? <Loader size={13} className={styles.spin} /> : <CheckCircle size={13} />}
+          Save
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function WhishSubscriptionCard() {
+  const [recipient, setRecipient] = useState<WhishRecipient | null>(null);
+  const [claims, setClaims] = useState<SubscriptionClaim[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [referenceNumber, setReferenceNumber] = useState('');
+  const [showForm, setShowForm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  function load() {
+    setLoading(true);
+    Promise.all([getSubscriptionRecipient(), getMySubscriptionClaims()])
+      .then(([r, c]) => { setRecipient(r); setClaims(c); })
+      .catch((e: unknown) => setErr(apiErr(e)))
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitting(true); setErr(null);
+    try {
+      await submitSubscriptionClaim(referenceNumber.trim());
+      setReferenceNumber(''); setShowForm(false);
+      load();
+    } catch (e: unknown) {
+      setErr(apiErr(e));
+    } finally { setSubmitting(false); }
+  }
+
+  return (
+    <div className={styles.infraCard}>
+      <div className={styles.infraCardHeader}>
+        <Smartphone size={14} className={styles.infraIcon} style={{ color: '#34d399' }} />
+        <span className={styles.infraCardTitle}>Pay via Whish Money</span>
+      </div>
+      {loading ? (
+        <p className={styles.manageEmpty}>Loading…</p>
+      ) : (
+        <div className={styles.infraForm}>
+          {recipient?.phoneNumber ? (
+            <p className={styles.sectionDesc} style={{ margin: 0 }}>
+              {recipient.customerCount} customer{recipient.customerCount !== 1 ? 's' : ''} × ${recipient.pricePerCustomerUsd?.toFixed(2)} = <strong>${recipient.priceUsd}</strong>. Send this via the Whish app to <strong>{recipient.phoneNumber}</strong>, then submit your reference number below.
+            </p>
+          ) : (
+            <p className={styles.sectionDesc} style={{ margin: 0 }}>
+              The superadmin hasn't published a Whish Money number yet.
+            </p>
+          )}
+
+          {!showForm && recipient?.phoneNumber && (
+            <button className={styles.infraBtn} onClick={() => setShowForm(true)}>
+              <Plus size={13} /> Submit payment reference
+            </button>
+          )}
+
+          {showForm && (
+            <form onSubmit={handleSubmit} className={styles.infraForm}>
+              <div className={styles.infraField}>
+                <label className={styles.infraLabel}>Whish Reference Number</label>
+                <input
+                  className={styles.infraInput}
+                  value={referenceNumber}
+                  onChange={(e) => setReferenceNumber(e.target.value)}
+                  required
+                />
+              </div>
+              {err && <div className={styles.infraError}><AlertCircle size={13} /> {err}</div>}
+              <div className={styles.addFormActions}>
+                <button type="button" className={styles.cancelBtn} onClick={() => setShowForm(false)}>Cancel</button>
+                <button type="submit" className={styles.generateBtn} disabled={submitting || !referenceNumber.trim()}>
+                  {submitting ? <><Loader size={13} className={styles.spin} /> Submitting…</> : 'Submit'}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {claims.length > 0 && (
+            <div className={styles.manageList} style={{ marginTop: '0.5rem' }}>
+              {claims.map((c) => (
+                <div key={c.id} className={styles.manageItem}>
+                  <div className={styles.manageItemLeft}>
+                    <span className={styles.manageItemName}>${c.amountClaimed} — {c.referenceNumber}</span>
+                    <span className={styles.manageItemMeta}>{new Date(c.createdAt).toLocaleDateString()}</span>
+                  </div>
+                  <span className={styles.manageBadge}>{c.status}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WhishReviewQueue() {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'SUPERADMIN';
+  const [subClaims, setSubClaims] = useState<SubscriptionClaim[]>([]);
+  const [custClaims, setCustClaims] = useState<CustomerPaymentClaim[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  function load() {
+    setLoading(true);
+    Promise.all([
+      isSuperAdmin ? getPendingSubscriptionClaims() : Promise.resolve([]),
+      listCustomerPaymentClaims(),
+    ])
+      .then(([s, c]) => { setSubClaims(s); setCustClaims(c); })
+      .catch((e: unknown) => setErr(apiErr(e)))
+      .finally(() => setLoading(false));
+  }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [isSuperAdmin]);
+
+  async function handleSubApprove(id: string) {
+    setBusyId(id); setErr(null);
+    try { await approveSubscriptionClaim(id); load(); }
+    catch (e) { setErr(apiErr(e)); }
+    finally { setBusyId(null); }
+  }
+  async function handleSubReject(id: string) {
+    setBusyId(id); setErr(null);
+    try { await rejectSubscriptionClaim(id); load(); }
+    catch (e) { setErr(apiErr(e)); }
+    finally { setBusyId(null); }
+  }
+  async function handleCustApprove(id: string) {
+    setBusyId(id); setErr(null);
+    try { await approveCustomerPaymentClaim(id); load(); }
+    catch (e) { setErr(apiErr(e)); }
+    finally { setBusyId(null); }
+  }
+  async function handleCustReject(id: string) {
+    setBusyId(id); setErr(null);
+    try { await rejectCustomerPaymentClaim(id); load(); }
+    catch (e) { setErr(apiErr(e)); }
+    finally { setBusyId(null); }
+  }
+
+  const nothingPending = subClaims.length === 0 && custClaims.length === 0;
+
+  return (
+    <div className={styles.infraCard}>
+      <div className={styles.infraCardHeader}>
+        <Smartphone size={14} className={styles.infraIcon} style={{ color: '#60a5fa' }} />
+        <span className={styles.infraCardTitle}>Pending Whish Payments</span>
+        <span className={styles.manageBadge}>{subClaims.length + custClaims.length}</span>
+      </div>
+      {loading ? (
+        <p className={styles.manageEmpty}>Loading…</p>
+      ) : (
+        <>
+          {err && <p className={styles.manageErr}>{err}</p>}
+          {nothingPending && <p className={styles.manageEmpty}>No pending Whish payments to review.</p>}
+
+          {subClaims.length > 0 && (
+            <div className={styles.manageList}>
+              <p className={styles.sectionDesc} style={{ margin: '0 0 0.25rem' }}>Subscription claims</p>
+              {subClaims.map((c) => (
+                <div key={c.id} className={styles.manageItem}>
+                  <div className={styles.manageItemLeft}>
+                    <span className={styles.manageItemName}>{c.admin?.name || c.admin?.email} — ${c.amountClaimed}</span>
+                    <span className={styles.manageItemMeta}>Ref: {c.referenceNumber}</span>
+                  </div>
+                  <div className={styles.manageItemActions}>
+                    <button className={styles.manageEditBtn} disabled={busyId === c.id} onClick={() => handleSubApprove(c.id)} title="Approve"><CheckCircle size={12} /></button>
+                    <button className={styles.manageDeleteBtn} disabled={busyId === c.id} onClick={() => handleSubReject(c.id)} title="Reject"><XCircle size={12} /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {custClaims.length > 0 && (
+            <div className={styles.manageList} style={{ marginTop: subClaims.length > 0 ? '0.75rem' : 0 }}>
+              <p className={styles.sectionDesc} style={{ margin: '0 0 0.25rem' }}>Customer bill payments</p>
+              {custClaims.map((c) => (
+                <div key={c.id} className={styles.manageItem}>
+                  <div className={styles.manageItemLeft}>
+                    <span className={styles.manageItemName}>
+                      {c.customer ? [c.customer.firstName, c.customer.middleName, c.customer.lastName].filter(Boolean).join(' ') : 'Customer'} — ${c.amount}
+                    </span>
+                    <span className={styles.manageItemMeta}>Ref: {c.referenceNumber}</span>
+                  </div>
+                  <div className={styles.manageItemActions}>
+                    <button className={styles.manageEditBtn} disabled={busyId === c.id} onClick={() => handleCustApprove(c.id)} title="Approve"><CheckCircle size={12} /></button>
+                    <button className={styles.manageDeleteBtn} disabled={busyId === c.id} onClick={() => handleCustReject(c.id)} title="Reject"><XCircle size={12} /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────
    SettingsView — main page
 ───────────────────────────────────────────────── */
 export function SettingsView() {
   const { data: regions, loading, error, refetch: refetchRegions } = useRegions();
   const [collapsedRegions, setCollapsedRegions] = useState<Set<string>>(new Set());
   const [regionKeys, setRegionKeys] = useState<Record<string, number>>({});
-  const [activeTab, setActiveTab] = useState<'infrastructure' | 'billing' | 'receipts' | 'accounts'>('infrastructure');
+  const [activeTab, setActiveTab] = useState<'infrastructure' | 'billing' | 'receipts' | 'accounts' | 'platformBilling'>('infrastructure');
   const { template: selectedReceiptTemplate, setTemplate: setSelectedReceiptTemplate } = useReceiptTemplate();
   const [accountsRefreshKey, setAccountsRefreshKey] = useState(0);
+  const { user } = useAuth();
+  const canSeePlatformBilling = user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
 
   function toggleRegion(id: string) {
     setCollapsedRegions((prev) => {
@@ -1166,6 +1570,14 @@ export function SettingsView() {
         >
           Accounts
         </button>
+        {canSeePlatformBilling && (
+          <button
+            className={`${styles.tabBtn} ${activeTab === 'platformBilling' ? styles.tabBtnActive : ''}`}
+            onClick={() => setActiveTab('platformBilling')}
+          >
+            Platform Billing
+          </button>
+        )}
       </div>
 
       <div className={styles.content}>
@@ -1313,6 +1725,27 @@ export function SettingsView() {
             <div className={styles.infraGrid}>
               <CreateAccountCard onSuccess={() => setAccountsRefreshKey((k) => k + 1)} />
               <AccountsList refreshKey={accountsRefreshKey} />
+            </div>
+          </section>
+        )}
+
+        {activeTab === 'platformBilling' && canSeePlatformBilling && (
+          <section className={styles.section}>
+            <h2 className={styles.sectionTitle}>Platform Billing</h2>
+            <p className={styles.sectionDesc}>
+              {user?.role === 'ADMIN'
+                ? 'Manage your subscription to Mouwalidi, and connect Stripe so your customers can pay their bills online.'
+                : 'Connect Stripe so customers you manage directly can pay their bills online.'}
+            </p>
+            <div className={styles.infraGrid}>
+              {user?.role === 'ADMIN' && <SubscriptionCard />}
+              <ConnectCard />
+              <WhishPhoneNumberCard />
+              {user?.role === 'ADMIN' && <WhishSubscriptionCard />}
+            </div>
+
+            <div className={styles.infraGrid} style={{ marginTop: '1.25rem' }}>
+              <WhishReviewQueue />
             </div>
           </section>
         )}

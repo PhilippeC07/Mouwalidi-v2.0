@@ -529,6 +529,153 @@ export class BillingService {
   }
 
   /**
+   * Same calc/filter logic as getGroupCustomerAllTimeBalances, scoped to a
+   * single customer, with the individual row ids included — used to snapshot
+   * exactly what's being paid for at Stripe Checkout-session-creation time.
+   * Deliberately NOT ownership-scoped here (no assertCustomerOwned) — this is
+   * an internal cross-service helper; callers are responsible for only ever
+   * passing a customer id the caller is actually allowed to act on.
+   */
+  async getCustomerOutstandingSnapshot(customerId: string): Promise<{
+    total: number;
+    consumptions: { id: string; remaining: number }[];
+    deposits: { id: string; remaining: number }[];
+  }> {
+    const [consumptions, deposits] = await Promise.all([
+      this.db.monthlyConsumption.findMany({
+        where: { customerId, closedBalance: false },
+        select: {
+          id: true,
+          previousCounter: true,
+          currentCounter: true,
+          monthlyFee: true,
+          balanceOverride: true,
+          amountPaid: true,
+          kwhPrice: true,
+          customer: { select: { isCounter: true } },
+        },
+      }),
+      this.db.deposit.findMany({
+        where: { customerId },
+        select: { id: true, amount: true, paidAmount: true },
+      }),
+    ]);
+
+    const consumptionRows: { id: string; remaining: number }[] = [];
+    for (const c of consumptions) {
+      const balance = this.calcBalance({
+        isCounter: c.customer.isCounter,
+        previousCounter: c.previousCounter,
+        currentCounter: c.currentCounter,
+        kwhPrice: c.kwhPrice,
+        monthlyFee: c.monthlyFee,
+        balanceOverride: c.balanceOverride,
+      });
+      const remaining = balance - c.amountPaid;
+      if (remaining > 0.001) consumptionRows.push({ id: c.id, remaining });
+    }
+
+    const depositRows: { id: string; remaining: number }[] = [];
+    for (const d of deposits) {
+      const remaining = d.amount - d.paidAmount;
+      if (remaining > 0.001) depositRows.push({ id: d.id, remaining });
+    }
+
+    const total =
+      consumptionRows.reduce((s, r) => s + r.remaining, 0) +
+      depositRows.reduce((s, r) => s + r.remaining, 0);
+
+    return { total, consumptions: consumptionRows, deposits: depositRows };
+  }
+
+  /** Applies a settled bill payment to exactly the rows snapshotted at checkout-creation time — idempotent (short-circuits if already succeeded) and capped against each row's current remaining (in case something changed since the snapshot). Shared by the Stripe webhook handler and the Whish manual-approval route. */
+  async applyPaymentSnapshot(paymentId: string, stripePaymentIntentId?: string): Promise<void> {
+    const payment = await this.db.payment.findUnique({ where: { id: paymentId } });
+    if (!payment) return;
+    if (payment.status === 'succeeded') return;
+
+    const snapshot = payment.snapshot as { consumptions: { id: string; remaining: number }[]; deposits: { id: string; remaining: number }[] };
+
+    await this.db.$transaction(async (tx) => {
+      for (const row of snapshot.consumptions) {
+        const current = await this.getConsumptionRemaining(row.id);
+        if (!current) continue;
+        const applyAmount = Math.min(row.remaining, Math.max(0, current.remaining));
+        if (applyAmount <= 0) continue;
+        await tx.monthlyConsumption.update({
+          where: { id: row.id },
+          data: {
+            amountPaid: { increment: applyAmount },
+            paidDate: new Date(),
+            closedBalance: current.remaining - applyAmount <= 0.001,
+          },
+        });
+      }
+
+      for (const row of snapshot.deposits) {
+        const deposit = await tx.deposit.findUnique({ where: { id: row.id }, select: { amount: true, paidAmount: true } });
+        if (!deposit) continue;
+        const currentRemaining = deposit.amount - deposit.paidAmount;
+        const applyAmount = Math.min(row.remaining, Math.max(0, currentRemaining));
+        if (applyAmount <= 0) continue;
+        await tx.deposit.update({
+          where: { id: row.id },
+          data: { paidAmount: { increment: applyAmount }, paidDate: new Date() },
+        });
+      }
+
+      await tx.payment.update({
+        where: { id: paymentId },
+        data: { status: 'succeeded', paidAt: new Date(), ...(stripePaymentIntentId ? { stripePaymentIntentId } : {}) },
+      });
+    });
+  }
+
+  /** Platform subscription price per customer/month (ADMIN -> SUPERADMIN billing) — shared by the Stripe and Whish payment paths so both always quote the same amount. */
+  get pricePerCustomerUsd(): number {
+    return Number(process.env.SUBSCRIPTION_PRICE_PER_CUSTOMER_USD ?? 0.5);
+  }
+
+  /** Total customers across all of an admin's regions — the unit the platform subscription is billed against. Not status-filtered: every Customer row tied to the admin's regions counts. */
+  async getAdminCustomerCount(adminUserId: string): Promise<number> {
+    return this.db.customer.count({
+      where: { consumptionType: { generatorGroup: { region: { ownerId: adminUserId } } } },
+    });
+  }
+
+  async getAdminSubscriptionPricing(adminUserId: string): Promise<{ customerCount: number; pricePerCustomerUsd: number; amountUsd: number }> {
+    const customerCount = await this.getAdminCustomerCount(adminUserId);
+    const amountUsd = Math.round(customerCount * this.pricePerCustomerUsd * 100) / 100;
+    return { customerCount, pricePerCustomerUsd: this.pricePerCustomerUsd, amountUsd };
+  }
+
+  /** Recomputes one MonthlyConsumption row's current remaining balance — used by the Stripe webhook handler to defensively cap a payment against what's actually still owed at settlement time (which may have shifted since the payment's snapshot was taken). */
+  async getConsumptionRemaining(id: string): Promise<{ remaining: number } | null> {
+    const c = await this.db.monthlyConsumption.findUnique({
+      where: { id },
+      select: {
+        amountPaid: true,
+        previousCounter: true,
+        currentCounter: true,
+        kwhPrice: true,
+        monthlyFee: true,
+        balanceOverride: true,
+        customer: { select: { isCounter: true } },
+      },
+    });
+    if (!c) return null;
+    const balance = this.calcBalance({
+      isCounter: c.customer.isCounter,
+      previousCounter: c.previousCounter,
+      currentCounter: c.currentCounter,
+      kwhPrice: c.kwhPrice,
+      monthlyFee: c.monthlyFee,
+      balanceOverride: c.balanceOverride,
+    });
+    return { remaining: balance - c.amountPaid };
+  }
+
+  /**
    * All-time billing totals for a region (across all its generator groups),
    * plus a per-group breakdown and a last-6-month trend for charting. Uses
    * the same all-time approach as getGroupCustomerAllTimeBalances rather than

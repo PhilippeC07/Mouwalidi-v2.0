@@ -44,6 +44,12 @@ export class UserResponseDto {
 
   @ApiPropertyOptional({ nullable: true })
   customerId!: string | null;
+
+  @ApiPropertyOptional({ nullable: true, description: 'ADMIN only — mirrors the Stripe Subscription status verbatim (e.g. active, past_due, canceled).' })
+  subscriptionStatus!: string | null;
+
+  @ApiPropertyOptional({ description: 'ADMIN/SUPERADMIN only — whether Stripe Connect onboarding is complete.' })
+  stripeConnectOnboarded!: boolean;
 }
 
 export class LoginResponseDto {

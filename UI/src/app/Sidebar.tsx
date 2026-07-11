@@ -32,7 +32,10 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
   const [collapsedRegions, setCollapsedRegions] = useState<Set<string>>(
     new Set(),
   );
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
+  // Tracks which generator groups have been manually expanded to reveal their
+  // generators — starts empty so groups are collapsed by default (the
+  // individual generator page has little value, so it's opt-in per group).
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
     new Set(),
   );
 
@@ -51,7 +54,7 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
   };
 
   const toggleGroup = (groupId: string) => {
-    setCollapsedGroups((prev) => {
+    setExpandedGroups((prev) => {
       const next = new Set(prev);
 
       if (next.has(groupId)) {
@@ -178,7 +181,7 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
                   {!isRegionCollapsed && (
                     <div className={styles.groupList}>
                       {region.groups.map((group) => {
-                        const isGroupCollapsed = collapsedGroups.has(group.id);
+                        const isGroupCollapsed = !expandedGroups.has(group.id);
 
                         return (
                           <div key={group.id} className={styles.groupItem}>
