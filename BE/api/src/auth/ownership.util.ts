@@ -25,6 +25,7 @@ export const customerWhere = (user: RequestingUser) => ({
 });
 export const viaCustomerWhere = (user: RequestingUser) => ({ customer: customerWhere(user) });
 export const consumptionTypeWhere = (user: RequestingUser) => ({ generatorGroup: { region: { ...ownerScope(user) } } });
+export const employeeWhere = (user: RequestingUser) => ({ ...ownerScope(user) });
 
 function assertOwned<T>(record: T | null, message: string): T {
   if (!record) throw new NotFoundException(message);
@@ -59,6 +60,11 @@ export const assertConsumptionTypeOwned = (db: PrismaService, user: RequestingUs
     .findFirst({ where: { id, ...consumptionTypeWhere(user) } })
     .then((r) => assertOwned(r, 'Consumption type not found.'));
 
+export const assertEmployeeOwned = (db: PrismaService, user: RequestingUser, id: string) =>
+  db.employee
+    .findFirst({ where: { id, ...employeeWhere(user) } })
+    .then((r) => assertOwned(r, 'Employee not found.'));
+
 /** CUSTOMER role may only ever access their own single record; ADMIN/SUPERADMIN fall back to ownership. */
 export async function assertCustomerAccessible(db: PrismaService, user: RequestingUser, id: string) {
   if (user.role === Role.CUSTOMER) {
@@ -80,4 +86,11 @@ export async function assertMonthlyConsumptionsOwned(db: PrismaService, user: Re
   if (isSuperAdmin(user) || consumptionIds.length === 0) return;
   const owned = await db.monthlyConsumption.count({ where: { id: { in: consumptionIds }, ...viaCustomerWhere(user) } });
   if (owned !== consumptionIds.length) throw new NotFoundException('One or more billing records were not found.');
+}
+
+/** Bulk variant for endpoints taking arbitrary region id arrays (e.g. an employee's region assignments). Throws unless EVERY id is owned. */
+export async function assertRegionsOwned(db: PrismaService, user: RequestingUser, regionIds: string[]) {
+  if (isSuperAdmin(user) || regionIds.length === 0) return;
+  const owned = await db.region.count({ where: { id: { in: regionIds }, ...regionWhere(user) } });
+  if (owned !== regionIds.length) throw new NotFoundException('One or more regions were not found.');
 }

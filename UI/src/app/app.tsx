@@ -6,7 +6,9 @@ import { GeneratorGroupView } from '../pages/GeneratorGroupView/GeneratorGroupVi
 import { RegionView } from '../pages/RegionView/RegionView.tsx';
 import { GroupManagementView } from '../pages/GroupManagementView/GroupManagementView.tsx';
 import { SettingsView } from '../pages/SettingsView/SettingsView.tsx';
+import { EmployeesView } from '../pages/EmployeesView/EmployeesView.tsx';
 import { CustomerDetailView } from '../pages/CustomerDetailView/CustomerDetailView.tsx';
+import { TeamView } from '../pages/TeamView/TeamView.tsx';
 import { AccountingSummary } from '../pages/AccountingView/AccountingSummary.tsx';
 import { AccountingReceivables } from '../pages/AccountingView/AccountingReceivables.tsx';
 import { AccountingPayments } from '../pages/AccountingView/AccountingPayments.tsx';
@@ -27,7 +29,9 @@ export default function App() {
             <Route path="generator-groups/:groupId" element={<GeneratorGroupView />} />
             <Route path="generator-groups/:groupId/manage" element={<GroupManagementView />} />
             <Route path="settings" element={<SettingsView />} />
+            <Route path="employees" element={<EmployeesView />} />
             <Route path="customers/:customerId" element={<CustomerDetailView />} />
+            <Route path="team" element={<TeamView />} />
             <Route path="billing-locked" element={<BillingLockedView />} />
             <Route path="accounting/summary" element={<AccountingSummary />} />
             <Route path="accounting/receivables" element={<AccountingReceivables />} />

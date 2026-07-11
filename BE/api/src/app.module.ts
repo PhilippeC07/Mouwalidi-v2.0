@@ -21,6 +21,8 @@ import { WhatsappService } from './whatsapp/whatsapp.service.js';
 import { StripeController } from './stripe/stripe.controller.js';
 import { StripeService } from './stripe/stripe.service.js';
 import { WhishController } from './whish/whish.controller.js';
+import { EmployeeController } from './employee/employee.controller.js';
+import { EmployeeService } from './employee/employee.service.js';
 
 @Module({
   imports: [
@@ -30,7 +32,7 @@ import { WhishController } from './whish/whish.controller.js';
       signOptions: { expiresIn: '7d' },
     }),
   ],
-  controllers: [AuthController, GeneratorController, CustomerController, BuildingController, BillingController, StripeController, WhishController],
+  controllers: [AuthController, GeneratorController, CustomerController, BuildingController, BillingController, StripeController, WhishController, EmployeeController],
   providers: [
     PrismaService,
     AuthService,
@@ -40,6 +42,7 @@ import { WhishController } from './whish/whish.controller.js';
     BillingService,
     WhatsappService,
     StripeService,
+    EmployeeService,
     JwtAuthGuard,
     RolesGuard,
     SubscriptionGuard,

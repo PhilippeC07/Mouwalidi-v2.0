@@ -18,7 +18,8 @@ export function Layout() {
 
   if (user.role === 'CUSTOMER') {
     const ownRoute = `/customers/${user.customerId}`;
-    if (location.pathname !== ownRoute) return <Navigate to={ownRoute} replace />;
+    const allowedRoutes = [ownRoute, '/team'];
+    if (!allowedRoutes.includes(location.pathname)) return <Navigate to={ownRoute} replace />;
   }
 
   const isLockedAdmin = user.role === 'ADMIN' && !['active', 'trialing'].includes(user.subscriptionStatus ?? '');

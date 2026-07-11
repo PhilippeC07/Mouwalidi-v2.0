@@ -30,6 +30,7 @@ model User {
   customerId   String?   @unique @db.Uuid
   customer     Customer? @relation(fields: [customerId], references: [id])
   ownedRegions Region[]  @relation("RegionOwner")
+  ownedEmployees Employee[] @relation("EmployeeOwner")
 
   // Subscription billing (ADMIN -> SUPERADMIN, this platform's own revenue)
   stripeCustomerId             String?   @unique
@@ -53,6 +54,25 @@ model Region {
   generatorGroups GeneratorGroup[]
   ownerId         String           @db.Uuid
   owner           User             @relation("RegionOwner", fields: [ownerId], references: [id])
+  employees       Employee[]       @relation("EmployeeRegions")
+}
+
+model Employee {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firstName         String
+  lastName          String
+  phoneNumber       String?
+  role              String
+  salary            Float
+  status            String   @default("active")
+  notes             String?
+  createdAt         DateTime @default(now())
+  ownerId           String   @db.Uuid
+  owner             User     @relation("EmployeeOwner", fields: [ownerId], references: [id])
+  regions           Region[] @relation("EmployeeRegions")
+  profilePictureUrl String?
+  idDocumentUrl     String?
+  visibleToCustomers Boolean @default(false)
 }
 
 model Generator {

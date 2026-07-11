@@ -14,6 +14,7 @@ import {
   Sun,
   Moon,
   LogOut,
+  Users,
 } from 'lucide-react';
 import { useRegions } from '../hooks/useGetRegions';
 import { useTheme } from '../context/ThemeContext';
@@ -82,6 +83,28 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
             <p className={styles.logoName}>Mouwalidi</p>
             <p className={styles.logoSub}>Power Management</p>
           </div>
+        </div>
+
+        <div className={styles.topSection}>
+          <p className={styles.sectionLabel}>Navigation</p>
+
+          <NavLink
+            to={`/customers/${user.customerId}`}
+            className={({ isActive }) => `${styles.navBtn} ${isActive ? styles.navBtnActive : ''}`}
+            onClick={handleNavigate}
+          >
+            <BarChart3 size={16} />
+            <span>My Account</span>
+          </NavLink>
+
+          <NavLink
+            to="/team"
+            className={({ isActive }) => `${styles.navBtn} ${isActive ? styles.navBtnActive : ''}`}
+            onClick={handleNavigate}
+          >
+            <Users size={16} />
+            <span>Our Team</span>
+          </NavLink>
         </div>
 
         <div className={styles.bottom} style={{ marginTop: 'auto', borderTop: 'none' }}>
@@ -306,6 +329,17 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
       </div>
 
       <div className={styles.bottom}>
+        <NavLink
+          to="/employees"
+          className={({ isActive }) =>
+            `${styles.navBtn} ${isActive ? styles.navBtnActive : ''}`
+          }
+          onClick={handleNavigate}
+        >
+          <Users size={16} />
+          <span>Employees</span>
+        </NavLink>
+
         <NavLink
           to="/settings"
           className={({ isActive }) =>
