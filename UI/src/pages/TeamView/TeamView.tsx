@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Phone } from 'lucide-react';
 import { getMyRegionTeam, type TeamMember } from '../../api/employee/employee.api';
+import { resolveUploadUrl } from '../../api/axios';
 import settingsStyles from '../SettingsView/SettingsView.module.css';
 import styles from './TeamView.module.css';
 
@@ -45,7 +46,7 @@ export function TeamView() {
             {team.map((member) => (
               <div key={member.id} className={styles.card}>
                 {member.profilePictureUrl ? (
-                  <img src={member.profilePictureUrl} alt="" className={styles.avatarImg} />
+                  <img src={resolveUploadUrl(member.profilePictureUrl)!} alt="" className={styles.avatarImg} />
                 ) : (
                   <div className={styles.avatar}>{initials(member)}</div>
                 )}

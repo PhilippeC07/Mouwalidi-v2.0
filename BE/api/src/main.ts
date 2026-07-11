@@ -12,7 +12,7 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   app.enableCors({
-    origin: 'http://localhost:5173',
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
     credentials: true,
   });
 
@@ -26,7 +26,10 @@ async function bootstrap() {
   const documentFactory = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, documentFactory);
 
-  await app.listen(3000);
+  // Platforms like Railway assign the port dynamically via $PORT and route
+  // to it on 0.0.0.0 — the hardcoded 3000/localhost binding only worked
+  // because local dev always uses the default.
+  await app.listen(process.env.PORT ? Number(process.env.PORT) : 3000, '0.0.0.0');
 }
 
 void bootstrap();

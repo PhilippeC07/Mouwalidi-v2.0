@@ -13,6 +13,7 @@ import {
   type Employee,
 } from '../../api/employee/employee.api';
 import { formatMoney } from '../../utils/format';
+import { resolveUploadUrl } from '../../api/axios';
 import settingsStyles from '../SettingsView/SettingsView.module.css';
 import dialogStyles from '../GeneratorView/GeneratorView.module.css';
 import styles from './EmployeesView.module.css';
@@ -203,7 +204,7 @@ export function EmployeesView() {
                   <div className={styles.cardHeader}>
                     <div className={styles.cardHeaderLeft}>
                       {emp.profilePictureUrl ? (
-                        <img src={emp.profilePictureUrl} alt="" className={styles.avatarImg} />
+                        <img src={resolveUploadUrl(emp.profilePictureUrl)!} alt="" className={styles.avatarImg} />
                       ) : (
                         <div className={styles.avatar}>{initials(emp)}</div>
                       )}
@@ -337,7 +338,7 @@ export function EmployeesView() {
                     onChange={(e) => setForm((f) => ({ ...f, photoFile: e.target.files?.[0] ?? null }))}
                   />
                   {form.currentPhotoUrl && !form.photoFile && (
-                    <a href={form.currentPhotoUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--tx-4)', fontSize: '0.75rem' }}>
+                    <a href={resolveUploadUrl(form.currentPhotoUrl)!} target="_blank" rel="noreferrer" style={{ color: 'var(--tx-4)', fontSize: '0.75rem' }}>
                       View current photo
                     </a>
                   )}
@@ -351,7 +352,7 @@ export function EmployeesView() {
                     onChange={(e) => setForm((f) => ({ ...f, idDocumentFile: e.target.files?.[0] ?? null }))}
                   />
                   {form.currentIdDocumentUrl && !form.idDocumentFile && (
-                    <a href={form.currentIdDocumentUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--tx-4)', fontSize: '0.75rem' }}>
+                    <a href={resolveUploadUrl(form.currentIdDocumentUrl)!} target="_blank" rel="noreferrer" style={{ color: 'var(--tx-4)', fontSize: '0.75rem' }}>
                       View current ID document
                     </a>
                   )}
